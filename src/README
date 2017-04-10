@@ -1,0 +1,5 @@
+This directory contains the source code and Makefile to compile an executable file.  The following third party software are required:
+1. Global Array Toolkit, version 5.0.  The toolkit can be downloaded from http://hpc.pnl.gov/globalarrays/download.shtml 
+     Use "./configure --enable-i4" to configure.
+2. Petsc. It can be downloaded from https://www.mcs.anl.gov/petsc/petsc-as/download/index.html
+   Only versions 3.1-p4 and petsc-3.3-p7 are supported.  Default is version 3.1-p4.
