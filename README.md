@@ -1,1 +1,1 @@
-# eSTOMP-WR
+eSTOMP-WR (exascale Subsurface Transport Over Multiple Phases) is a highly scalable (parallel), general-purpose tool for simulating subsurface flow and reactive transport in variably saturated geologic media.  It's written in Fortran 90.  The user guide can be found at http://stomp.pnnl.gov/estomp_guide/eSTOMP_guide.stm.
