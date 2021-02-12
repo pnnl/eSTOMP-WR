@@ -447,6 +447,7 @@
         IUNMOL = 0
       ELSEIF( IUMX.NE.IUNM .OR. IUKGX.NE.IUNKG .OR. IUSX.NE.IUNS .OR. &
           IUKX.NE.IUNK .OR. IUMOLX.NE.IUNMOL ) THEN
+
         IF( INDX.EQ.0 .OR. INDX.EQ.2 .OR. INDX.EQ.3 ) THEN
           INDX = 4
           IF( INDX.EQ.3 ) INDX = 21

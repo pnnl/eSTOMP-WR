@@ -82,6 +82,7 @@
 
 
       REAL*8 SRX(8+LSOLU)
+      LOGICAL :: use_ga
 !
 !----------------------Include Statements------------------------------!
 !

@@ -82,7 +82,7 @@
       ICSNX = INDEX( SUBNMX,'  ' )-1
       SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
       IF( INDEX(CVS_ID(204)(1:1),'$').EQ.0 ) CVS_ID(204) = &
-     '$Id: stomp1.F,v 1.50 2008/02/13 16:22:59 d3c002 Exp $' 
+       '$Id: stomp1.F,v 1.50 2008/02/13 16:22:59 d3c002 Exp $' 
       ICSN = ICSN+ICSNX
       DO 400 N = 1,num_nodes
         IF( IXP(N).LE.0 ) GOTO 400

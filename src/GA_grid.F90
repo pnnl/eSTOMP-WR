@@ -5,9 +5,10 @@ subroutine grid_init
   use react
   use trnspt
   use bufferedread
-
+  use const 
   implicit none
-! 
+
+#include "mpif.h"
 #include "mafdecls.fh"
 #include "global.fh"
 !
@@ -48,19 +49,21 @@ subroutine grid_init
   double precision :: xfs,yfs,zfs
   double precision :: xfn,yfn,zfn
   double precision :: afxx,volx,afyx,afzx,varx
-  double precision :: small,epsl,grav,tmp_x
+!  double precision :: small,epsl,grav,
+  double precision :: tmp_x
   double precision :: dxw,dxe,dyn,dys,dzb,dzt
   double precision :: atltx,atlty,atltz
-
-
+  integer :: n_node,ii !BH
+  CHARACTER*16 FORM2
+  DATA FORM2 / '(10(1PE16.9,1X))' /
   gwidth = 2 
 
   pnum = ga_nnodes()
   me = ga_nodeid()
 
-  nxdim = 0
-  nydim = 0
-  nzdim = 0
+!  nxdim = 0
+!  nydim = 0
+!  nzdim = 0
 !  dx = 0.0d00
 !  dy = 0.0d00
 !  dz = 0.0d00
@@ -71,8 +74,9 @@ subroutine grid_init
   nxdim = ifld
   nydim = jfld
   nzdim = kfld
+  nxyz = (nxdim+1)*(nydim+1)*(nzdim+1)
   if (me.ne.0) then
-   if(ics /= 8) then
+   if(ics /= 8 .AND. ics /=3) then !BH
     if(.not. allocated(x)) allocate(x(nxdim+1))
     if(.not. allocated(y)) allocate(y(nydim+1))
     if(.not. allocated(z)) allocate(z(nzdim+1))
@@ -86,9 +90,10 @@ subroutine grid_init
     xbf = 0.0d00
     ybf = 0.0d00
     zbf = 0.0d00
+
    endif
   endif
- if(ics /=8) then
+ if(ics /=8 .AND. ics /=3 ) then !BH
   call ga_dgop(4,x(1),nxdim+1,'+')
   call ga_dgop(5,y(1),nydim+1,'+')
   call ga_dgop(6,z(1),nzdim+1,'+')
@@ -103,24 +108,46 @@ subroutine grid_init
   call ga_dgop(4,xbf(1,1,1),nxyz,'+')
   call ga_dgop(5,ybf(1,1,1),nxyz,'+')
   call ga_dgop(6,zbf(1,1,1),nxyz,'+')
+
+ ! Record the cell node coordinates -BH    
+!    allocate(xlnbf(nxdim,nydim,nzdim))
+!    allocate(ylnbf(nxdim,nydim,nzdim))
+!    allocate(zlnbf(nxdim,nydim,nzdim))
+!    xlnbf = 0.0d00
+!    ylnbf = 0.0d00
+!    zlnbf = 0.0d00
+
+!    if (me == 0) then
+!        allocate(xnbf(nxdim,nydim,nzdim))
+!        allocate(ynbf(nxdim,nydim,nzdim))
+!        allocate(znbf(nxdim,nydim,nzdim))
+!        xnbf = 0.0d00
+!        ynbf = 0.0d00
+!        znbf = 0.0d00
+!    endif    
+
  endif
 ! arrays for hydraulic gradient
 !
   allocate(hgz_table_z(nzdim))
- if(ics /= 8) then
+ if(ics /= 8 .AND. ics /=3 ) then !BH
   do i=1,nzdim
     hgz_table_z(i) = (z(i)+z(i+1))/2.d0
   enddo
  else
+!BH
   do i=1,nzdim
     hgz_table_z(i) = (zbf(1,1,i)+zbf(1,1,i+1))/2.d0
   enddo
+!   allocate(hgz_table_z_bfg(nxdim,nydim,nzdim))  
+!   hgz_table_z_bfg(:,:,:) = 0.d0
+
  endif
   ndim = 3
   dims(1) = nxdim
   dims(2) = nydim
   dims(3) = nzdim
-!print *,'nxdim',nxdim,nydim,nzdim
+!print *,'0_NXDIM',nxdim,nydim,nzdim
 !  dims(1) = 3200
 !  dims(2) = 3200
 !  dims(3) = 15
@@ -147,6 +174,7 @@ subroutine grid_init
   else
    call grid_factor(pnum,nxdim,nydim,nzdim,px,py,pz)
   endif
+!print *,'1_NXDIM',nxdim,nydim,nzdim
   blocks(1) = px
   blocks(2) = py
   blocks(3) = pz
@@ -169,6 +197,7 @@ subroutine grid_init
     ga_mapc(icnt) = int(dble(nzdim)*dble(i-1)/dble(pz))+1
     icnt = icnt + 1
   end do
+!print *,'3_NXDIM',nxdim,nydim,nzdim
 !
   ga_dbl = ga_create_handle()
 #ifdef USE_E4D
@@ -193,6 +222,7 @@ subroutine grid_init
 !
   call nga_distribution(ga_dbl, me, lo, hi)
 !print *,'lo----hi',me,lo(1:3),hi(1:3)
+!  write(*,'(a,7(I3,X))') 'ME, LO, HI', me,lo,hi
   ixmin = lo(1)
   iymin = lo(2)
   izmin = lo(3)
@@ -201,6 +231,7 @@ subroutine grid_init
   izmax = hi(3)
 113 format(i4,' ',a5,': ',i4)
 !
+!  write(*,'(a,7(I3,X))') 'me, xmin, xmax',me,ixmin,iymin,izmin,ixmax,iymax,izmax
   iaxmin = ixmin
   if (lo(1).gt.1) iaxmin = iaxmin-gwidth
   iaymin = iymin
@@ -211,14 +242,18 @@ subroutine grid_init
   if (hi(1).lt.nxdim) iaxmax = iaxmax+gwidth
 !print *,'in ga',me,iaxmax,hi(1)
 !stop
+! print *,'4_NXDIM',nxdim,nydim,nzdim
   iaymax = iymax
   if (hi(2).lt.nydim) iaymax = iaymax+gwidth
   iazmax = izmax
   if (hi(3).lt.nzdim) iazmax = iazmax+gwidth
+
+!  write(*,'(a,7(I3,X))') 'me,axmin, axmax',me,iaxmin,iaymin,iazmin,iaxmax,iaymax,iazmax
   ldx = iaxmax - iaxmin + 1
   ldy = iaymax - iaymin + 1
   ldz = iazmax - iazmin + 1
 114 format(i4,' ',a6,': ',i4)
+ write(*,'(a,4(I3,X))') 'me,ldx,ldy,ldz',me,ldx,ldy,ldz
 !
 !  Determine number of locally held nodes, etc.
 !
@@ -226,6 +261,8 @@ subroutine grid_init
   allocate(local_node_list(num_loc_nodes))
   num_nodes = (iaxmax-iaxmin+1)*(iaymax-iaymin+1)*(iazmax-iazmin+1)
   allocate(grid_mask(num_nodes))
+!  write(*,*) 'Me, num_loc_nodes,num_nodes',me,num_loc_nodes,num_nodes
+  
 !
   ixx = ixmax-ixmin
   if (ixmin.gt.1.and.nxdim.ne.1) ixx = ixx + 1
@@ -252,6 +289,8 @@ subroutine grid_init
   num_bcnx = ixx*(iymax-iymin+1)*(izmax-izmin+1) &
            + iyy*(ixmax-ixmin+1)*(izmax-izmin+1) &
            + izz*(ixmax-ixmin+1)*(iymax-iymin+1)
+!  write(*,*) 'me,num_bcnx',me,num_bcnx
+!  print *,'5_NXDIM',nxdim,nydim,nzdim
 !
 !  Start building grid. This will need to be replaced with STOMP input
 !  routines
@@ -303,7 +342,7 @@ subroutine grid_init
 ! Assign grid cell locations and volumes
 !
   inode = 0
-  if(ics == 8) then
+  if(ics == 8 .or. ics ==3) then !BH
     allocate(afx(6,num_nodes))
     afx = 0.d0
     allocate(grv_x(6,num_nodes))
@@ -314,6 +353,13 @@ subroutine grid_init
     dxg_p = 0.d0
   endif
   do i = 1, num_nodes
+!  write(*,*) 'num_nodes',num_nodes
+!  nxdim = ifld
+!  nydim = jfld
+!  nzdim = kfld
+!        print *,'ifld',ifld,jfld,kfld
+!        print *,'6_NXDIM',nxdim,nydim,nzdim 
+!        print *,'dims',dims
 !
 ! Evaluate local indices of node
 !
@@ -341,6 +387,7 @@ subroutine grid_init
     ixx = ixx + ixmin - 1
     iyy = iyy + iymin - 1
     izz = izz + izmin - 1
+!    write(*,'(a,5(I10,X))')'me, i, ixx,iyy,izz',me, I,ixx,iyy,izz
 !
 !  Determine if node is local, ghost, or unused
 !
@@ -368,7 +415,10 @@ subroutine grid_init
 ! unused node
       grid_mask(i) = 0
     endif
-   if(ics /= 8) then
+!        write(*,'(a,6(I10,X))')'02 ixx,iyy,izz,ixmin,iymin,izmin',ixx,iyy,izz,ixmin,iymin,izmin
+!        write(*,*) 'i,grid mask:',i,grid_mask(i)
+!        write(*,*) 'ics',ics
+   if(ics.ne.8 .AND. ics .ne. 3) then !BH
     d_xc(i) = (x(ixx)+x(ixx+1))*0.5d00
     dxgf(i) = (x(ixx+1)-x(ixx))
     d_yc(i) = (y(iyy)+y(iyy+1))*0.5d00
@@ -382,6 +432,7 @@ subroutine grid_init
     d_vol(i) = (x(ixx+1)-x(ixx))*(y(iyy+1)-y(iyy))*(z(izz+1)-z(izz))
     endif
    else
+!        write(*,*) 'i,d_vol (should be 0)',i,d_vol(i)
       d_vol(i) = 0.d0
         PXMIN = 1.D+20
         PXMAX = -1.D+20
@@ -391,7 +442,7 @@ subroutine grid_init
         PZMAX = -1.D+20
 !
 !---        West surface centroid  ---
-!
+!       write(*,'(a,6(I10,X))')'021 ixx,iyy,izz,ixmin,iymin,izmin',ixx,iyy,izz,ixmin,iymin,izmin
         XVX(1) = XBF(IXX,IYY,IZZ)
         XVX(2) = XBF(IXX,IYY+1,izz)
         XVX(3) = XBF(ixx,iyy+1,izz+1)
@@ -402,10 +453,11 @@ subroutine grid_init
         YVX(4) = YBF(ixx,iyy,izz+1)
         ZVX(1) = ZBF(ixx,iyy,izz)
         ZVX(2) = ZBF(ixx,iyy+1,izz)
-        ZVX(3) = ZBF(Ixx,iyy+1,izz+1)
-        ZVX(4) = ZBF(Ixx,iyy,izz+1)
+        ZVX(3) = ZBF(ixx,iyy+1,izz+1)
+        ZVX(4) = ZBF(ixx,iyy,izz+1)
         NP = 4
         DO 1741 NX = 1,NP
+!          write(*,*) 'NX',NX
           PXMIN = MIN( XVX(NX),PXMIN )
           PXMAX = MAX( XVX(NX),PXMAX )
           PYMIN = MIN( YVX(NX),PYMIN )
@@ -414,6 +466,7 @@ subroutine grid_init
           PZMAX = MAX( ZVX(NX),PZMAX )
    1741       CONTINUE
         CALL PGCNTRD( NP,XVX,YVX,ZVX,XFW,YFW,ZFW )
+
 !
 !---        East surface centroid  ---
 !
@@ -542,6 +595,19 @@ subroutine grid_init
         d_xc(I) = 5.D-1*(XFW+XFE)
         d_yc(I) = 5.D-1*(YFS+YFN)
         d_zc(I) = 5.D-1*(ZFB+ZFT)
+
+! Assign cell centroid coordinates to a global matrix.
+! This global matrix is still a local variable  -BH
+!        write(*,'(a,7(I3,X))') 'ME,xmin,xmax,ymin,ymax,zmin,zmax:',me,ixmin,ixmax,iymin,iymax,izmin,izmax 
+!        if (ixx .GE. ixmin .AND. ixx .LE. ixmax .AND. &
+!              iyy .GE. iymin .AND. iyy .LE. iymax .AND. &
+!                izz .GE. izmin .AND. izz .LE. izmax) then
+!        
+!                xlnbf(ixx,iyy,izz) = d_xc(I)
+!                ylnbf(ixx,iyy,izz) = d_yc(I)
+!                zlnbf(ixx,iyy,izz) = d_zc(I)
+!       endif
+
         IF( d_xc(I).LT.PXMIN .OR. d_xc(I).GT.PXMAX .OR. &
           d_yc(I).LT.PYMIN .OR. d_yc(I).GT.PYMAX .OR. &
           d_zc(I).LT.PZMIN .OR. d_zc(I).GT.PZMAX ) THEN
@@ -568,6 +634,7 @@ subroutine grid_init
 !
 !---      West surface area and volume contributions  ---
 !
+!
       AFX(1,i) = 0.D+0
       DO 1750 ITX = 1,4
         JTX = ITX+1
@@ -593,6 +660,7 @@ subroutine grid_init
         ZVX(3) = ZBF(Ixx+1,iyy+1,izz+1)
         ZVX(4) = ZBF(Ixx+1,iyy,izz+1)
       NP = 4
+
 !
 !---      East surface area and volume contributions  ---
 !
@@ -607,6 +675,7 @@ subroutine grid_init
           ZVX(JTX),XFE,YFE,ZFE,d_xc(i),d_yc(i),d_zc(i),VOLX )
         D_VOL(I) = D_VOL(I)+VOLX
    1752     CONTINUE
+
 !
 !---      West-east differentials  ---
 !
@@ -630,6 +699,8 @@ subroutine grid_init
         ZVX(3) = ZBF(Ixx+1,iyy,izz+1)
         ZVX(4) = ZBF(Ixx,iyy,izz+1)
       NP = 4
+
+
 !
 !---      South surface area and volume contributions  ---
 !
@@ -744,7 +815,8 @@ subroutine grid_init
       DZGF(N) = MAX( DZB+DZT,SMALL )
       DXG_P(5,N) = MAX( dxg_p(5,n)+DZB,SMALL )
       DXG_P(6,n) = MAX( dxg_p(6,n)+DZT,SMALL )
-!
+
+        !
 !---      West-east gravity vectors and surface tilts  ---
 !
       IF( IXX.EQ.iaxmin ) THEN
@@ -916,15 +988,16 @@ subroutine grid_init
       ENDIF
 
    endif
+!        print *,'i ixx, iyy, izz,nxdim,nydim',i,ixx, iyy, izz,dims
     i_id(i) = (ixx-1) + (iyy-1)*nxdim + (izz-1)*nxdim*nydim + 1
+!    i_id(i) = (ixx-1) + (iyy-1)*dims(1) + (izz-1)*dims(2)*nydim + 1
 !print *,'i_id-----i_id','me=',me,i,i_id(i)
   end do
+  n_node = nxdim*nydim*nzdim
+
   if (inode.ne.num_loc_nodes) then
     write(6,*) me,' Huge error on local node list'
   endif
-!print *,'local',me,num_loc_nodes
-!print*,'lo-hi',me,'lo',lo,'hi',hi
-!stop
 !
 ! set up connections
 !
@@ -1008,6 +1081,7 @@ subroutine grid_init
     kmin = gwidth+1
   endif
   kmax = kmin + izmax-izmin
+!  write(*,'(a,7I5)') 'x,me,imin,imax,jmin,jmax,kmin,kmax: ',me,imin,imax,jmin,jmax,kmin,kmax
   do k = kmin, kmax
     do j = jmin, jmax
       do i = imin, imax
@@ -1025,7 +1099,7 @@ subroutine grid_init
 !        else
 !          nd2cnx(2,id2) = icnt
 !        endif
-      if(ics /= 8) then
+      if(ics /= 8 .AND. ics /= 3) then !BH
         if(ics.eq.2) then
           d_area(icnt) = x(ixx+1)*(y(iyy+1)-y(iyy))*(z(izz+1)-z(izz))
         else
@@ -1034,7 +1108,7 @@ subroutine grid_init
       endif
         i_id1(icnt) = id1
         i_id2(icnt) = id2
-       if(ics /= 8) then
+       if(ics /= 8 .AND. ics /=3) then !BH
         rx = d_xc(id2) - d_xc(id1)
         ry = d_yc(id2) - d_yc(id1)
         rz = d_zc(id2) - d_zc(id1)
@@ -1053,7 +1127,7 @@ subroutine grid_init
         d_dist_up(icnt) = sqrt(rx**2+ry**2+rz**2)
         d_fdis(icnt) = 0.5d00
 !        c_xcen(icnt) = x(ixx+1)
-       else
+       elseif(ics==8) then !BH
         d_xsep(icnt) = 1.d0
         d_ysep(icnt) = 0.d0
         d_zsep(icnt) = 0.d0
@@ -1064,6 +1138,24 @@ subroutine grid_init
         tltx(icnt) = tlt_x(2,id1)
         grvpx(id1) = 0.5d0*(grv_x(1,id1)+grv_x(2,id1))
         grvpx(id2) = 0.5d0*(grv_x(1,id2)+grv_x(2,id2))
+!BH
+       else
+        rx = d_xc(id2) - d_xc(id1)
+        ry = d_yc(id2) - d_yc(id1)
+        rz = d_zc(id2) - d_zc(id1)
+        r = sqrt(rx**2+ry**2+rz**2)
+        d_xsep(icnt) = rx/r
+        d_ysep(icnt) = ry/r
+        d_zsep(icnt) = rz/r
+        d_dist(icnt) = r
+        d_dist_dn(icnt) = dxg_p(2,id1)
+        d_dist_up(icnt) = dxg_p(1,id2)
+        d_area(icnt) = afx(2,id1)
+        grvx(icnt) = grv_x(2,id1)
+        tltx(icnt) = tlt_x(2,id1)
+        grvpx(id1) = 0.5d0*(grv_x(1,id1)+grv_x(2,id1))
+        grvpx(id2) = 0.5d0*(grv_x(1,id2)+grv_x(2,id2))
+!BH
        endif
       end do
     end do
@@ -1103,6 +1195,7 @@ subroutine grid_init
     kmin = gwidth+1
   endif
   kmax = kmin + izmax-izmin
+!  write(*,'(a,7I5)') 'y,me,imin,imax,jmin,jmax,kmin,kmax: ',me,imin,imax,jmin,jmax,kmin,kmax
   do k = kmin, kmax
     do j = jmin, jmax
       do i = imin, imax
@@ -1122,7 +1215,7 @@ subroutine grid_init
 !        endif
         i_id1(icnt) = id1
         i_id2(icnt) = id2
-       if(ics /= 8) then
+       if(ics /= 8 .AND. ics /= 3) then !BH
         d_area(icnt) = (x(ixx+1)-x(ixx))*(z(izz+1)-z(izz))
         rx = d_xc(id2) - d_xc(id1)
         ry = d_yc(id2) - d_yc(id1)
@@ -1141,7 +1234,7 @@ subroutine grid_init
         rz = d_zc(id2)-0.5d0*(z(izz)+z(izz+1))
         d_dist_up(icnt) = sqrt(rx**2+ry**2+rz**2)
         d_fdis(icnt) = 0.5d00
-       else
+       elseif(ics==8) then !BH
         d_xsep(icnt) = 0.d0
         d_ysep(icnt) = 1.d0
         d_zsep(icnt) = 0.d0
@@ -1152,6 +1245,24 @@ subroutine grid_init
         tltx(icnt) = tlt_x(4,id1)
         grvpy(id1) = 0.5d0*(grv_x(3,id1)+grv_x(4,id1))
         grvpy(id2) = 0.5d0*(grv_x(3,id2)+grv_x(4,id2))
+!BH
+       else
+        rx = d_xc(id2) - d_xc(id1)
+        ry = d_yc(id2) - d_yc(id1)
+        rz = d_zc(id2) - d_zc(id1)
+        r = sqrt(rx**2+ry**2+rz**2)
+        d_xsep(icnt) = rx/r
+        d_ysep(icnt) = ry/r
+        d_zsep(icnt) = rz/r
+        d_dist(icnt) = r
+        d_dist_dn(icnt) = dxg_p(4,id1)
+        d_dist_up(icnt) = dxg_p(3,id2)
+        d_area(icnt) = afx(4,id1)
+        grvx(icnt) = grv_x(4,id1)
+        tltx(icnt) = tlt_x(4,id1)
+        grvpy(id1) = 0.5d0*(grv_x(3,id1)+grv_x(4,id1))
+        grvpy(id2) = 0.5d0*(grv_x(3,id2)+grv_x(4,id2))        
+!BH       
        endif
       end do
     end do
@@ -1187,6 +1298,7 @@ subroutine grid_init
       kmax = kmin + (iazmax-iazmin-3)
     endif
   endif
+!  write(*,'(a,7I5)') 'z,me,imin,imax,jmin,jmax,kmin,kmax: ',me,imin,imax,jmin,jmax,kmin,kmax
   do k = kmin, kmax
     do j = jmin, jmax
       do i = imin, imax
@@ -1206,12 +1318,15 @@ subroutine grid_init
 !        endif
         i_id1(icnt) = id1
         i_id2(icnt) = id2
-       if(ics /= 8) then
+       if(ics /= 8 .AND. ics /= 3) then !BH
         if(ics.eq.2) then
           d_area(icnt) = (x(ixx+1)*x(ixx+1)-x(ixx)*x(ixx))*(y(iyy+1)-y(iyy))/2.d0
         else
           d_area(icnt) = (x(ixx+1)-x(ixx))*(y(iyy+1)-y(iyy))
         endif
+       endif
+
+       if(ics /= 8 .AND. ics /= 3) then !BH
         rx = d_xc(id2) - d_xc(id1)
         ry = d_yc(id2) - d_yc(id1)
         rz = d_zc(id2) - d_zc(id1)
@@ -1230,7 +1345,7 @@ subroutine grid_init
         d_dist_up(icnt) = sqrt(rx**2+ry**2+rz**2)
         d_fdis(icnt) = 0.5d00
         grvx(icnt) = 9.81d0
-       else
+       elseif(ics==8) then !BH
         d_xsep(icnt) = 0.d0
         d_ysep(icnt) = 0.d0
         d_zsep(icnt) = 1.d0
@@ -1241,10 +1356,29 @@ subroutine grid_init
         tltx(icnt) = tlt_x(6,id1)
         grvpz(id1) = 0.5d0*(grv_x(5,id1)+grv_x(6,id1))
         grvpz(id2) = 0.5d0*(grv_x(5,id2)+grv_x(6,id2))
+!BH
+       else
+        rx = d_xc(id2) - d_xc(id1)
+        ry = d_yc(id2) - d_yc(id1)
+        rz = d_zc(id2) - d_zc(id1)
+        r = sqrt(rx**2+ry**2+rz**2)
+        d_xsep(icnt) = rx/r
+        d_ysep(icnt) = ry/r
+        d_zsep(icnt) = rz/r
+        d_dist(icnt) = r
+        d_dist_dn(icnt) = dxg_p(6,id1)
+        d_dist_up(icnt) = dxg_p(5,id2)
+        d_area(icnt) = afx(6,id1)
+        grvx(icnt) = grv_x(6,id1)
+        tltx(icnt) = tlt_x(6,id1)
+        grvpz(id1) = 0.5d0*(grv_x(5,id1)+grv_x(6,id1))
+        grvpz(id2) = 0.5d0*(grv_x(5,id2)+grv_x(6,id2))
+!BH
        endif
       end do
     end do
   end do
+!  write(*,*) 'me,num_cnx,icnt',me,num_cnx,icnt
   if (num_cnx.ne.icnt) then
     write(6,*) me,' Huge error calculating connections'
   endif
@@ -1326,7 +1460,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8 ) then 
+         if(ics /= 8 .AND. ics /=3 ) then !BH 
 
           if(ics.eq.2) then
             d_barea(icnt) = x(ixx)*(y(iyy+1)-y(iyy))*(z(izz+1)-z(izz))
@@ -1337,12 +1471,12 @@ subroutine grid_init
           d_bycent(icnt) = 0.5d0*(y(iyy)+y(iyy+1))
           d_bzcent(icnt) = 0.5d0*(z(izz)+z(izz+1))
            d_bdist(icnt) = d_xc(id1)-x(ixx)
-          else
+         else
            d_barea(icnt) = afx(1,id1)
            d_bdist(icnt) = dxg_p(1,id1)
            b_grvx(icnt) = grv_x(1,id1)
            b_tltx(icnt) = tlt_x(1,id1)
-          endif
+         endif
           rx = -1.0d00
           ry = 0.0d00
           rz = 0.0d00
@@ -1380,7 +1514,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8) then
+          if(ics /= 8 .AND. ics /= 3) then !BH
           if(ics.eq.2) then
             d_barea(icnt) = x(ixx)*(y(iyy+1)-y(iyy))*(z(izz+1)-z(izz))
           else
@@ -1434,7 +1568,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8) then
+          if(ics /= 8 .AND. ics /= 3) then !BH
           d_barea(icnt) = (x(ixx+1)-x(ixx))*(z(izz+1)-z(izz))
           d_bxcent(icnt) = 0.5d0*(x(ixx)+x(ixx+1))
           d_bycent(icnt) = y(iyy)
@@ -1483,7 +1617,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8) then
+          if(ics /= 8.AND. ics /= 3 ) then !BH
           d_barea(icnt) = (x(ixx+1)-x(ixx))*(z(izz+1)-z(izz))
           d_bxcent(icnt) = 0.5d0*(x(ixx)+x(ixx+1))
           d_bycent(icnt) = y(iyy+1)
@@ -1533,7 +1667,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8) then
+          if(ics /= 8 .AND. ics /= 3) then !BH
           if(ics.eq.2) then
             d_barea(icnt) = (x(ixx+1)*x(ixx+1)-x(ixx)*x(ixx))*(y(iyy+1)-y(iyy))/2.d0
           else
@@ -1550,6 +1684,7 @@ subroutine grid_init
            b_grvx(icnt) = grv_x(5,id1)
            b_tltx(icnt) = tlt_x(5,id1)
           endif
+         if (ics /= 3) then !BH
           rx = 0.0d00
           ry = 0.0d00
           rz = -1.0d00
@@ -1557,6 +1692,32 @@ subroutine grid_init
           d_bxsep(icnt) = rx/r
           d_bysep(icnt) = ry/r
           d_bzsep(icnt) = rz/r
+!BH
+         else
+!---        Bottom surface centroid  ---             
+          XVX(1) = XBF(Ixx,iyy,izz)
+          XVX(2) = XBF(Ixx+1,iyy,izz)
+          XVX(3) = XBF(Ixx+1,iyy+1,izz)
+          XVX(4) = XBF(Ixx,iyy+1,izz)
+          YVX(1) = YBF(Ixx,iyy,izz)
+          YVX(2) = YBF(Ixx+1,iyy,izz)
+          YVX(3) = YBF(Ixx+1,iyy+1,izz)
+          YVX(4) = YBF(Ixx,iyy+1,izz)
+          ZVX(1) = ZBF(Ixx,iyy,izz)
+          ZVX(2) = ZBF(Ixx+1,iyy,izz)
+          ZVX(3) = ZBF(Ixx+1,iyy+1,izz)
+          ZVX(4) = ZBF(Ixx,iyy+1,izz)
+          NP = 4
+          CALL PGCNTRD( NP,XVX,YVX,ZVX,XFB,YFB,ZFB )
+          rx = XFB - d_xc(id1)
+          ry = YFB - d_yc(id1)
+          rz = ZFB - d_zc(id1)
+          r = sqrt(rx**2+ry**2+rz**2)
+          d_bxsep(icnt) = rx/r
+          d_bysep(icnt) = ry/r
+          d_bzsep(icnt) = rz/r
+         endif
+!BH
         end do
       end do
     end do
@@ -1587,7 +1748,7 @@ subroutine grid_init
           i_bidi(icnt) = i
           i_bidj(icnt) = j
           i_bidk(icnt) = k
-          if(ics /= 8) then
+          if(ics /= 8 .AND. ics /= 3 ) then !BH
           if(ics.eq.2) then
             d_barea(icnt) = (x(ixx+1)*x(ixx+1)-x(ixx)*x(ixx))*(y(iyy+1)-y(iyy))/2.d0
           else
@@ -1604,13 +1765,40 @@ subroutine grid_init
            b_grvx(icnt) = grv_x(6,id1)
            b_tltx(icnt) = tlt_x(6,id1)
           endif
-          rx = 0.0d00
-          ry = 0.0d00
-          rz = 1.0d00
-          r = sqrt(rx**2+ry**2+rz**2)
-          d_bxsep(icnt) = rx/r
-          d_bysep(icnt) = ry/r
-          d_bzsep(icnt) = rz/r
+          if (ics /= 3) then
+           rx = 0.0d00
+           ry = 0.0d00
+           rz = 1.0d00
+           r = sqrt(rx**2+ry**2+rz**2)
+           d_bxsep(icnt) = rx/r
+           d_bysep(icnt) = ry/r
+           d_bzsep(icnt) = rz/r
+!BH
+          else
+!---        Top surface centroid  ---
+           XVX(1) = XBF(Ixx,iyy,izz+1)
+           XVX(2) = XBF(Ixx+1,iyy,izz+1)
+           XVX(3) = XBF(Ixx+1,iyy+1,izz+1)
+           XVX(4) = XBF(Ixx,iyy+1,izz+1)
+           YVX(1) = YBF(Ixx,iyy,izz+1)
+           YVX(2) = YBF(Ixx+1,iyy,izz+1)
+           YVX(3) = YBF(Ixx+1,iyy+1,izz+1)
+           YVX(4) = YBF(Ixx,iyy+1,izz+1)
+           ZVX(1) = ZBF(Ixx,iyy,izz+1)
+           ZVX(2) = ZBF(Ixx+1,iyy,izz+1)
+           ZVX(3) = ZBF(Ixx+1,iyy+1,izz+1)
+           ZVX(4) = ZBF(Ixx,iyy+1,izz+1)
+           NP = 4
+           CALL PGCNTRD( NP,XVX,YVX,ZVX,XFT,YFT,ZFT )
+           rx = XFT - d_xc(id1)
+           ry = YFT - d_yc(id1)
+           rz = ZFT - d_zc(id1)
+           r = sqrt(rx**2+ry**2+rz**2)
+           d_bxsep(icnt) = rx/r
+           d_bysep(icnt) = ry/r
+           d_bzsep(icnt) = rz/r    
+          endif
+!BH
         end do
       end do
     end do
@@ -1618,24 +1806,26 @@ subroutine grid_init
   if (num_bcnx.ne.icnt) then
     write(6,*) me,' Huge error calculating boundary connections'
   endif
-#ifdef USE_E4D
+!mlr
+!#ifdef USE_E4D
 !--- E4D PATCH
-  IF (.NOT.GAE4D) THEN
-#endif
-    if(ics /= 8) then
+!  IF (.NOT.GAE4D) THEN
+!#endif
+    if(ics /= 8 .AND. ics /= 3 ) then !BH
       if(allocated(x)) deallocate(x)
       if(allocated(y)) deallocate(y)
       if(allocated(z)) deallocate(z)
-#ifdef USE_E4D
+!#ifdef USE_E4D
     else
-      if(allocated(xbf)) deallocate(xbf)
-      if(allocated(ybf)) deallocate(ybf)
-      if(allocated(zbf)) deallocate(zbf)
-#endif
+!BH      if(allocated(xbf)) deallocate(xbf)
+!BH      if(allocated(ybf)) deallocate(ybf)
+!BH      if(allocated(zbf)) deallocate(zbf)
+!#endif
     endif
-#ifdef USE_E4D
-  ENDIF
-#endif
+!        write(*,*) 'END GRID_INIT'
+!#ifdef USE_E4D
+!  ENDIF
+!#endif
   return
 ! DO-NOT-DELETE splicer.end(stmpgrid.GAGrid.grid_init)
 end subroutine grid_init
@@ -4450,6 +4640,7 @@ end subroutine parse_id
 
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   X3 = Y1*Z2 - Z1*Y2
   Y3 = Z1*X2 - X1*Z2
   Z3 = X1*Y2 - Y1*X2
@@ -4549,6 +4740,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   ENORM_3D = SQRT ( X1*X1 + Y1*Y1 + Z1*Z1 )
   ICSN = ICSN-ICSNX
   SUBNM = SUBNM(1:ICSN)
@@ -4662,6 +4854,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   AREA = 0.D+0
   CX = 0.D+0
   CY = 0.D+0
@@ -4679,7 +4872,6 @@ end subroutine parse_id
   CZ = CZ/AREA
   ICSN = ICSN-ICSNX
   SUBNM = SUBNM(1:ICSN)
-
 !
 !---  End of PGCNTRD group  ---
 !
@@ -4785,6 +4977,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   SUMX = 0.D+0
   SUMX2 = 0.D+0
   SUMX3 = 0.D+0
@@ -4966,6 +5159,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   RM4DET = &
       AX(1,1) * ( &
       AX(2,2) * ( AX(3,3) * AX(4,4) - AX(3,4) * AX(4,3) ) &
@@ -5083,6 +5277,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   AX(1,1) = X1
   AX(2,1) = X2
   AX(3,1) = X3
@@ -5212,7 +5407,8 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $'
-  CALL CROSS_3D ( X2-X1,Y2-Y1,Z2-Z1,X3-X1,Y3-Y1,Z3-Z1,X4,Y4,Z4 )
+   ICSN = ICSN+ICSNX
+   CALL CROSS_3D ( X2-X1,Y2-Y1,Z2-Z1,X3-X1,Y3-Y1,Z3-Z1,X4,Y4,Z4 )
   NORM = ENORM_3D ( X4,Y4,Z4 )
   AREA = 5.D-1*NORM
   ICSN = ICSN-ICSNX
@@ -5356,7 +5552,6 @@ end subroutine parse_id
      18     CONTINUE
     ENDIF
      19 CONTINUE
-  ICSN = ICSN-ICSNX
   SUBNM = SUBNM(1:ICSN)
 !
 !---  End of LUDCMP group  ---
@@ -5442,6 +5637,7 @@ end subroutine parse_id
   SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
   IF( INDEX(CVS_ID(143)(1:1),'$').EQ.0 ) CVS_ID(143) = &
    '$Id: rdgrid.F,v 1.19 2009/05/15 14:58:57 d3c002 Exp $'
+  ICSN = ICSN+ICSNX
   II = 0
   DO 12 I = 1,N
     IL = IX(I)

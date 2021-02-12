@@ -73,6 +73,7 @@
 !----------------------Type Declarations-------------------------------!
 !
       REAL*8 STWX(LUK+1),RWP(LUK),RWA(LUK,6),FW(LSFV,6)
+      LOGICAL :: use_ga
 !
 !----------------------Include Statements------------------------------!
 !

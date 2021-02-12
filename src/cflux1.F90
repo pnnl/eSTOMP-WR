@@ -68,6 +68,7 @@
       double precision, dimension(3) :: s_fx_dn
       double precision, dimension(3) :: s_area_x 
       logical :: isjcb
+      LOGICAL :: use_ga
 !
 !----------------------Include Statements------------------------------!
 !
@@ -143,8 +144,24 @@
     aux = abs(u_x)
     avx = abs(u_y)
     awx = abs(u_z)
-    dpb = (dplb*(ulbsq*aux+vlbsq*avx+wlbsq*awx) + &
-       dptb*(ulbsq+vlbsq+wlbsq-(ulbsq*aux+vlbsq*avx+wlbsq*awx)))/(zvb+small)
+!BH
+!    dpb = (dplb*(ulbsq*aux+vlbsq*avx+wlbsq*awx) + &
+!       dptb*(ulbsq+vlbsq+wlbsq-(ulbsq*aux+vlbsq*avx+wlbsq*awx)))/(zvb+small)
+    disptv_dn = disptv((id_dn))*smdef(nsl,id_dn) !BH vertical disp.
+    disptv_up = disptv((id_up))*smdef(nsl,id_up) !BH vertical disp.
+    dptvb = difmn(disptv_dn,disptv_up,dist_dnx,dist_upx,q_flux(1,iconn),indx)
+
+    IF (aux.EQ.1 .AND. avx.EQ.0 .AND.awx.EQ.0) THEN
+            dpb = (dplb * ulbsq + dptb * vlbsq + dptvb * wlbsq)/(zvb+small)
+    ELSEIF (aux.EQ.0 .AND. avx.EQ.1 .AND.awx.EQ.0) THEN
+            dpb = (dplb * vlbsq + dptb * ulbsq + dptvb * wlbsq)/(zvb+small)
+    ELSEIF (aux.EQ.0 .AND. avx.EQ.0 .AND.awx.EQ.1) THEN
+            dpb = (dplb * wlbsq + dptvb * ulbsq + dptvb * vlbsq)/(zvb+small)
+    ENDIF
+!BH
+
+
+
 !
 !---        Molecular diffusion coefficients at the nodes  ---
 !

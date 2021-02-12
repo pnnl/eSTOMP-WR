@@ -132,6 +132,11 @@
       CALL ADD_NODE_DFIELD('dispt', IDX)
       DISPT => D_ND_FLD(IDX)%P
       DISPT = 0.d0
+!BH Vertical component of transverse dispersivity
+      CALL ADD_NODE_DFIELD('disptv', IDX)
+      DISPTV => D_ND_FLD(IDX)%P
+      DISPTV = 0.d0
+!BH
       DIM1 = 3
       DIM2 = LSOLU+LSPT
       CALL ADD_NODE_D3FIELD('sdcl', DIM1, DIM2, IDX)
@@ -154,6 +159,10 @@
       PCSL = 0.D0
       N = 0
       IJK = 0
+!BH
+      ALLOCATE(XYZ_DISPERSIVITY(NROCK))
+      XYZ_DISPERSIVITY(:) = 0
+!BH
    10 CONTINUE
       IF( N.GE.NROCK .OR. IJK.GT.0 ) GOTO 600
       ISTART = 1
@@ -193,6 +202,24 @@
       ELSE
         IFLG = IROCK
       ENDIF
+!BH
+!--- Determine whether there are two or three dispersivity components
+      I_CHAR = 1
+      N_COMMA = 0
+      XYZ_DISPERSIVITY = .FALSE.
+      DO WHILE(I_CHAR .LE. Len(CHDUM))
+        IF (INDEX(CHDUM(I_CHAR:I_CHAR),',').NE.0) THEN
+                N_COMMA = N_COMMA + 1
+        ENDIF
+        I_CHAR = I_CHAR + 1
+      ENDDO
+
+      IF (N_COMMA .EQ. 7) THEN  ! Detect three dispersivity components
+        XYZ_DISPERSIVITY(N) = 1
+      ENDIF
+!BH
+
+
 !
 !---  Longitudinal dispersivity  ---
 !
@@ -216,29 +243,89 @@
         IF( DISPLX.GE.SMALL ) IDISP = 1
         T_OK = COPYIJK1D( DISPL,DISPLX,IFLG )
       ENDIF
+
 !
 !---  Transverse dispersivity  ---
 !
-      VARB = 'Transverse Dispersivity: '
-      IF( INDEX(CHDUM,'file').NE.0 ) THEN
-        UNTS = 'm'
-        IUNM = 1
-        T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
-        VARX = GETUNITS( CHDUM,UNTS,ISTART,ICOMMA )
-        T_OK = RDIJK1D( T_FILENAME,LDXX,LO,HI,DISPT,VARX,ISBIN,ISHDF5 )
-        IDISP = 1
-      ELSE
-        CALL RDDPR(ISTART,ICOMMA,CHDUM,DISPTX)
-        CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-        IF(ME.EQ.0) WRITE(IWR,'(2X,4A,1PE11.4)') VARB(1:IVR),', ',UNTS(1:NCH),  &
-       ': ',DISPTX
-        INDX = 0
-        IUNM = 1
-        CALL RDUNIT(UNTS,DISPTX,INDX)
-        if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',DISPTX,', m)'
-        IF( DISPTX.GE.SMALL ) IDISP = 1
-        T_OK = COPYIJK1D( DISPT,DISPTX,IFLG )
+      IF (XYZ_DISPERSIVITY(N).EQ.0) THEN
+! Only one transverse component
+        VARB = 'Transverse Dispersivity: '
+        IF( INDEX(CHDUM,'file').NE.0 ) THEN
+                UNTS = 'm'
+                IUNM = 1
+                T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
+                VARX = GETUNITS( CHDUM,UNTS,ISTART,ICOMMA )
+                T_OK = RDIJK1D( T_FILENAME,LDXX,LO,HI,DISPT,VARX,ISBIN,ISHDF5 )
+                IDISP = 1
+        ELSE
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,DISPTX)
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+               IF(ME.EQ.0) WRITE(IWR,'(2X,4A,1PE11.4)') VARB(1:IVR),', ',&
+                        UNTS(1:NCH), ': ',DISPTX
+                INDX = 0
+                IUNM = 1
+                CALL RDUNIT(UNTS,DISPTX,INDX)
+               if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',DISPTX,', m)'
+                IF( DISPTX.GE.SMALL ) IDISP = 1
+                ! Equal the third component to the second one
+                DISPTVX = DISPTX
+                T_OK = COPYIJK1D( DISPT,DISPTX,IFLG )
+                T_OK = COPYIJK1D( DISPTV,DISPTVX,IFLG )
+        ENDIF
+
+      ELSEIF (XYZ_DISPERSIVITY(N).EQ.1) THEN
+
+! Two (horizontal and vertical) dispersivity components
+!
+!---  Horizontal Transverse dispersivity  ---
+!
+        VARB = 'Horizontal Transverse Dispersivity: '
+        IF( INDEX(CHDUM,'file').NE.0 ) THEN
+                UNTS = 'm'
+                IUNM = 1
+                T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
+                VARX = GETUNITS( CHDUM,UNTS,ISTART,ICOMMA )
+                T_OK = RDIJK1D( T_FILENAME,LDXX,LO,HI,DISPT,VARX,ISBIN,ISHDF5 )
+                IDISP = 1
+        ELSE
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,DISPTX)
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                IF(ME.EQ.0) WRITE(IWR,'(2X,4A,1PE11.4)')VARB(1:IVR),',',UNTS(1:NCH),  &
+                        ': ',DISPTX
+                INDX = 0
+                IUNM = 1
+                CALL RDUNIT(UNTS,DISPTX,INDX)
+               if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',DISPTX,', m)'
+                IF( DISPTX.GE.SMALL ) IDISP = 1
+                T_OK = COPYIJK1D( DISPT,DISPTX,IFLG )
+        ENDIF
+
+!
+!---  Vertical Transverse dispersivity  ---
+!
+        VARB = 'Vertical Transverse Dispersivity: '
+        IF( INDEX(CHDUM,'file').NE.0 ) THEN
+                UNTS = 'm'
+                IUNM = 1
+                T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
+                VARX = GETUNITS( CHDUM,UNTS,ISTART,ICOMMA )
+                T_OK = RDIJK1D( T_FILENAME,LDXX,LO,HI,DISPTV,VARX,ISBIN,ISHDF5 )
+                IDISP = 1
+        ELSE
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,DISPTVX)
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                IF(ME.EQ.0) WRITE(IWR,'(2X,4A,1PE11.4)') VARB(1:IVR),',',UNTS(1:NCH),  &
+                        ': ',DISPTVX
+                INDX = 0
+                IUNM = 1
+                CALL RDUNIT(UNTS,DISPTVX,INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',DISPTVX,', m)'
+                IF( DISPTX.GE.SMALL ) IDISP = 1
+                T_OK = COPYIJK1D( DISPTV,DISPTVX,IFLG )
+        ENDIF
       ENDIF
+!BH
+
 !
 !---  Loop over number of solutes or radionuclides  ---
 !

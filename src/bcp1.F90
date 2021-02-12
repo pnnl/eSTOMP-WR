@@ -78,6 +78,18 @@
 !----------------------Parameter Statements----------------------------!
 !
 
+     
+
+      interface
+        subroutine get_bcnx_ifield(t_string, t_field,  &
+                t_ok)
+        use grid_mod
+        implicit none
+        character (len=*) :: t_string ! in
+        integer, pointer :: t_field(:) ! out
+        logical :: t_ok ! out
+        end subroutine get_bcnx_ifield
+      end interface
 
 
 !
@@ -93,6 +105,9 @@
       real*8 pgbx(isvc+2),tbx(isvc+2)
       integer, dimension(:), allocatable :: ncntx
       integer :: nrfx
+      LOGICAL :: use_ga,t_ok
+      integer, pointer ::i_bid(:), i_bidi(:), i_bidj(:),i_bidk(:)
+      character(len=64):: format_110
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -125,13 +140,18 @@
 !
 !---  Loop over boundary conditions  ---
 !
+! BH get global index for boundary cells
+        call get_bcnx_ifield('bcnx_id',i_bid,t_ok)
+!        ib = i_bid(nb)
       nrfx = size(base_node,1)
       if(nrfx >0) then
        allocate(ncntx(nrfx))
        ncntx = 0
       endif
       nhdcx = 0
+!      write(*,*) 'me,num_bcnx',me,num_bcnx
       DO 400 NB = 1,num_bcnx
+        ib = i_bid(nb)
         TMZ = TM
         IF( NSTEP-NRST.EQ.0 ) TMZ = TMZ*(1.D+0+EPSL)+EPSL
         MB = IBCIN(NB)
@@ -667,7 +687,18 @@
 !---      X-Y-Z Aqueous Seepage Face
 !
           ELSEIF( ABS(IBCT(IEQW,NB)).EQ.45 ) THEN
-            if(ncntx(irefbx) == 0) then
+       !     ix = i_bidi(nb)
+       !     jx = i_bidj(nb)
+       !     kx = i_bidk(nb)
+!            ib = i_bid(nb)
+!           write(*,'(a,4I6)') 'me,nx,ny,nz',me,nxdim,nydim,nzdim
+!           write(*,'(a,4I6)') 'me,lx,ly,lz',me,ldx,ldy,ldz
+!           write(*,*) 'me,size i_bid',me,size(i_bid)
+!           write(*,'(a,3I6,4F16.8)') 'me,nb,gi,xc,yc,zc',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),zpb(nb)
+
+! Now use cell centroidi, instead of face centroid, to specify static
+! pressure. -BH
+           if(ncntx(irefbx) == 0) then
               ncntx(irefbx) = 1
               xbs = basex(irefbx)
               ybs = basey(irefbx)
@@ -676,11 +707,61 @@
               plxb = plx
               tbx = t(m,n)
 !--- Create table for pressure interpolation
-
+!              write(*,'(a,3I6,4F16.8)') 'me,nb,ib,xref,yref,zref,zbase',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),zbs
               hgz_table_p(:,irefbx) = 0.d0
 !              call locate(hgz_table_z,nzdim,zbs,ix)
 !              hgz_table_z(ix) = zbs
+             if(ics == 3 .OR. ics == 8) then
+              plxb_ = bcxpxx
+              tx = t(m,n)
+              tbx = tx
+              h_min_dz = 10000.00
+              iz_min = 0
+              do i = 1, nzdim
+                ib_tmp = ib+(i-1)*ldx*ldy
+                hgz_table_z(i) = d_zc(ib_tmp)
+                dz_tmp = abs(hgz_table_z(i)-zbs)
+                 !   write(*,*) 'me, dz_tmp: ',me,dz_tmp
+                    if (dz_tmp <= h_min_dz) then
+                       h_min_dz = dz_tmp
+                       iz_min = i
+                    endif
+              enddo
+!              write(*,'(a,2(I3X),F16.8)') 'me,z_min,d_basez: ',me,iz_min,h_min_dz
+              plx = plxb_
+              dz_tmp = hgz_table_z(iz_min)-zbs
+              px = plx + patm
+              call watlqd( tx,px,rholx )
+              plx = plx - rholx*gravz*dz_tmp
+              hgz_table_p(iz_min,irefbx) = plx
+                
+              do i = iz_min,1,-1
+                 if (i == iz_min) cycle
+                   dz_tmp = hgz_table_z(i+1) - hgz_table_z(i)
+                   px = plx + patm
+                   call watlqd( tx,px,rholx )
+                   plx = plx + rholx*gravz*dz_tmp
+                   hgz_table_p(i,irefbx) = plx
+              enddo
+              plx = hgz_table_p(iz_min,irefbx)
+              do i =iz_min,nzdim
+                 if (i == iz_min) cycle
+                   dz_tmp = hgz_table_z(i) - hgz_table_z(i-1)
+                   px = plx + patm
+                   call watlqd( tx,px,rholx )
+                   plx = plx - rholx*gravz*dz_tmp
+                   hgz_table_p(i,irefbx) = plx
+              enddo
+!     write(format_110, '(a,i1,a)') '(a,I3,X,',nzdim,'(F8.4,2X))'
+!     write(*,format_110) 'bfg_hgz_table_z:',me,hgz_table_z(:)
+!     write(format_110, '(a,i1,a)') '(a,I3,X,',nzdim,'(F16.8,2X))'
+!     write(*,format_110) 'bfg_hgz_table_p:',me,hgz_table_p(:,irefbx)
+
+       !         write(*,'(a,I3,X,10(F8.4,2X))') 'bfg_hgz_table_z: ',me,hgz_table_z(:)
+       !         write(*,'(a,I3,X,10(F16.8,2X))') 'bfg_hgz_table_p: ',me,hgz_table_p(:,irefbx) 
+             else
               do i=1,nzdim
+!                 write(*,'(a,2I4,2F16.8)') 'me,i,hgz_table_z(i),zbs',me,i,hgz_table_z(i),zbs
 !                if(hgz_table_z(i) < zbs) then
 !                  hgz_table_p(i,irefbx) = 0.d0
                 if(hgz_table_z(i) == zbs) then
@@ -710,7 +791,11 @@
                   plx = plx - (hgz_table_z(i)-hgz_table_z(i-1))*rholx*gravz
                   hgz_table_p(i,irefbx) = plx
               enddo
+!              write(*,'(a,I3,X,10(F8.4,2X))') 'hgz_table_z: ',me,hgz_table_z(:)
+!                write(*,'(a,I3,X,10(F16.8,2X))')'hgz_table_z: ',me,hgz_table_p(:,irefbx)
+             endif
             endif
+         if (ics .ne. 3 .AND. ics .ne. 8) then
            i = 0
            call locate(hgz_table_z,nzdim,zpb(nb),i)
            zlx = hgz_table_z(i)
@@ -737,15 +822,37 @@
 !             plx = max(plowx - (zpb(nb)-zlx)*rholx*gravz, pgx)
              plx = plowx - (zpb(nb)-zlx)*rholx*gravz
            endif
+         else
+           h_min_dz = 10000.00
+           iz_min = 0
+           do i = 1, nzdim
+                dz_tmp = abs(hgz_table_z(i)-zpb(nb))
+                    if (dz_tmp <= h_min_dz) then
+                       h_min_dz = dz_tmp
+                       iz_min = i
+                    endif
+           enddo
+!            if (iz_min == 0) write(*,'(a,I6,a,I2)') 'Cannot locate the &
+!                                 cell at NB=',NB,', at Node: ',me
+!           write(*,*) 'me,z_min,d_z',me,z_min,min_dz 
+           zlx = hgz_table_z(iz_min)
+           plowx = hgz_table_p(iz_min,irefbx)
+           px = max( plowx,pgx ) + patm
+           call watlqd( tbx,px,rholx )
+           plx = plowx - (zpb(nb)-zlx)*rholx*gravz  
+         endif
            dxx = xpb(nb) - xbs
            dyx = ypb(nb) - ybs
            dzx = zpb(nb) - zbs
            plx = plx + dxx*bcx(lbcv-2) + dyx*bcx(lbcv-1)  &
                       + dzx*bcx(lbcv)
+!           write(*,'(a,2I6,3F16.8)') 'me,nb,bcx',me,nb,bcx(lbcv-2),bcx(lbcv-1),bcx(lbcv)
            plxw = plx
            pgxw = pgx
            plx = max(pgxw,plxw)
-          ENDIF
+!          write(*,'(a,I3X,3(I6X))') 'me,lx,ly,lz: ',me,ldx,ldy,ldz
+!          write(*,'(a,4(I6X),4(F16.8X))')'me,nb,ib,m,x,y,z,plx:',me,nb,ib,m,d_xc(ib),d_yc(ib),d_zc(ib),plx
+       ENDIF
 !
 !---  Secondary and primary boundary variables  ---
 !
@@ -791,6 +898,10 @@
           PLB(M,NB) = PLX - PATM
           PGB(M,NB) = PGX - PATM
           TB(M,NB) = TX
+          
+!          write(*,*) 'me,NB,final pressure',me,nb,plx-PATM 
+!          write(*,'(a,I3X,3(I6X))') 'me,lx,ly,lz: ',me,ldx,ldy,ldz
+!          write(*,'(a,3(I6),3(F16.8),F20.10)')'me,nb,ib,xc,yc,zc,plx:',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),plx-patm
   200     CONTINUE
   300   CONTINUE
   400 CONTINUE
@@ -800,5 +911,5 @@
 !---  End of BCP1 group
 !
       RETURN
-      END
+        END
 

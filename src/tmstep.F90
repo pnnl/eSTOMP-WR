@@ -73,7 +73,7 @@
 #include "mafdecls.fh"
 #include "global.fh"
 !
-
+      LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -165,9 +165,9 @@
       DTOB = BIG
       IF( ISLC(20).EQ.1 ) THEN
         DO 160 NT = 1,NOBDT
-!        DO 160 NS = 1,NOBDS(NT)
-!          IF( R_OBDS(2,NS,NT).GT.TM )
-!     &      DTOB = MIN( DTOB,R_OBDS(2,NS,NT)-TM )
+        DO 160 NS = 1,NOBDS(NT)
+          IF( R_OBDS(2,NS,NT).GT.TM ) &
+           DTOB = MIN( DTOB,R_OBDS(2,NS,NT)-TM )
   160   CONTINUE
         TMOB = TM + DTOB
       ENDIF

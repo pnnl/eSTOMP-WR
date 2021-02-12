@@ -140,6 +140,7 @@ end interface
 !  type(sidl_double_1d) :: t_rvec
 !  type(sidl_int_1d) :: t_ivec
   logical :: t_ok
+  LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -708,14 +709,14 @@ end interface
 !        C_OBDT(L) = 'null'
 !        NOBDS(L) = 0
 ! 2340 CONTINUE
-!      NOBDT = 0
-!      NOBDP = 0
-!      IOBDEF = 40
-!      IOBDSF = 41
-!      IOBDUF = 42
-!      TMOB = 1.D+20
-!      FLG_UNI = .FALSE.
-!      FLG_EXT = .FALSE.
+      NOBDT = 0
+      NOBDP = 0
+      IOBDEF = 40
+      IOBDSF = 41
+      IOBDUF = 42
+      TMOB = 1.D+20
+      FLG_UNI = .FALSE.
+      FLG_EXT = .FALSE.
 !
 !---  [ REACT ] Reaction Variables  ---
 !
@@ -1072,6 +1073,7 @@ end interface
   logical :: t_ok
   integer, pointer :: i_bid(:)
   integer :: idx
+  LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -1360,6 +1362,7 @@ end interface
 !----------------------Type Declarations-------------------------------!
 !
       CHARACTER*4 FORM1
+     LOGICAL :: use_ga
 !
 !----------------------Data Statements---------------------------------!
 !

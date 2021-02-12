@@ -79,6 +79,7 @@
       INTEGER :: DIM1,IPRFX,LO(3),HI(3),LDXX(3)
       DOUBLE PRECISION :: PERMX(9)
       LOGICAL T_OK
+      LOGICAL :: ISBIN
 !
 !----------------------Common Blocks-----------------------------------!
 !

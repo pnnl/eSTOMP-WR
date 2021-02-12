@@ -74,7 +74,8 @@
       double precision, dimension(3) :: s_fx_dn
       double precision, dimension(3) :: s_area_x 
       logical :: isjcb
-!
+      LOGICAL :: use_ga
+ !
 !----------------------Include Statements------------------------------!
 !
 #include "mafdecls.fh"

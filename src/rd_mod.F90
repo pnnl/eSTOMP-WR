@@ -1196,6 +1196,8 @@
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  YNB
       REAL(KIND=DP), DIMENSION(:), pointer ::  DISPL
       REAL(KIND=DP), DIMENSION(:), pointer ::  DISPT
+      REAL(KIND=DP), DIMENSION(:), pointer ::  DISPTV  !BH Vertical transverse dispersivity
+      INTEGER,DIMENSION(:), ALLOCATABLE:: XYZ_DISPERSIVITY !BH whether there are two or there components of dispersivity
       REAL(KIND=DP), DIMENSION(:,:,:), ALLOCATABLE ::  RCHDF
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  SOLML
       REAL(KIND=DP), DIMENSION(:,:,:), ALLOCATABLE ::  RCHDFL
@@ -2503,6 +2505,10 @@
       INTEGER :: NOBDP
       LOGICAL :: FLG_UNI
       LOGICAL :: FLG_EXT
+      integer,dimension(:),allocatable :: nc_b
+      integer, dimension(:,:), allocatable :: nc_bs
+      real(kind=dp), dimension(:,:,:), allocatable :: xyz_b
+      integer, dimension(:), allocatable :: nro
 !
 !---  End of module  ---
 !

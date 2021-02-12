@@ -68,8 +68,9 @@
 #include "global.fh"
 !
 
-
-
+      LOGICAL :: use_ga
+      REAL*8:: vdr(3),max_idr
+      integer:: id_max
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -90,7 +91,10 @@
       DO 100 M = 1,ISVF
 !        MP = MNEG(M)
         mp = mpos(m)
+!       write(*,'(a,3I6,3F16.8)') 'me,N,nb,vx,vy,vz: ',me,N,NB,uvxb(nb),uvyb(nb),uvzb(nb)
+!       write(*,'(a,2I6,3F16.8)') 'me,N,xc,yc,zc: ',me,N,d_xc(n),d_yc(n),d_zc(n)
 ! to be replaced with surface normal direction
+       if (ics /= 3 .AND. ics /= 8) then ! BH
         if(abs(uvxb(nb)).gt.1.d-20) then
           xnorm = uvxb(nb)
         elseif(abs(uvyb(nb)).gt.1.d-20) then
@@ -98,6 +102,22 @@
         elseif(abs(uvzb(nb)).gt.1.d-20) then
           xnorm = uvzb(nb)
         endif
+!BH
+       else
+        vdr(1) = uvxb(nb)
+        vdr(2) = uvyb(nb)
+        vdr(3) = uvzb(nb)
+        max_idr = 0.0
+        id_max = 0
+        do i_dir = 1, 3
+          if (abs(vdr(i_dir))>=max_idr) then
+            max_idr = abs(vdr(i_dir))
+            id_max = i_dir
+          endif
+        enddo
+        xnorm = vdr(id_max)
+       endif
+!BH
 !        IF( IBCD(NB).LT.0 )THEN
 !          RKLU = RKLB(1,MP,NB)
 !          RKLX = RKL(1,MP,N)

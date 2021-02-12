@@ -75,6 +75,7 @@ integer :: g_buf
 logical :: status
 double precision :: alpha
 integer :: dim1
+LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !

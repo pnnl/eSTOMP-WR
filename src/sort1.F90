@@ -88,6 +88,7 @@
       REAL*8 SRX(8+LSOLU),VX(10),C_FX(6),AREAXX(6)
       INTEGER IVX(10)
       EXTERNAL ADRM
+      LOGICAL :: use_ga
 !
 !----------------------Include Statements------------------------------!
 !

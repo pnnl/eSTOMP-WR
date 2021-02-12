@@ -79,6 +79,7 @@
 !----------------------Parameter Statements----------------------------!
 !
        LOGICAL :: ISJCB
+       LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !

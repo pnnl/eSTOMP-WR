@@ -121,17 +121,17 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 !     PETSc scalable linear equation solver (KSP)  ---
 !
   if(npes == 1) then
-#ifdef PETSC_3_3
-   call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, PETSC_COPY_VALUES,mapping,ierr)
-#else
+!#ifdef PETSC_3_3
+!   call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, PETSC_COPY_VALUES,mapping,ierr)
+!#else
    call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, mapping,ierr)
-#endif
+!#endif
   else
-#ifdef PETSC_3_3
-   call ISLocalToGlobalMappingCreate(PETSC_COMM_WORLD, nrx, l2gmap,PETSC_COPY_VALUES, mapping,ierr)
-#else
+!#ifdef PETSC_3_3
+!   call ISLocalToGlobalMappingCreate(PETSC_COMM_WORLD, nrx, l2gmap,PETSC_COPY_VALUES, mapping,ierr)
+!#else
    call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, mapping,ierr)
-#endif
+!#endif
   endif
 !num_nodesx = num_nodes
 !do n=1,num_nodes
@@ -149,20 +149,20 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
     CALL MatCreateSeqAIJ( PETSC_COMM_SELF,G_SIZE,G_SIZE,0,D_NNZ,petsc_A,IERR )
     CALL KSPCreate( PETSC_COMM_SELF,petsc_ksp,IERR ) 
   ELSE
-#ifdef PETSC_3_3
-    CALL MatCreateAIJ( PETSC_COMM_WORLD,L_SIZE,L_SIZE, &
-       G_SIZE,G_SIZE,0,D_NNZ,0,O_NNZ,petsc_A,IERR )
-#else
+!#ifdef PETSC_3_3
+!    CALL MatCreateAIJ( PETSC_COMM_WORLD,L_SIZE,L_SIZE, &
+!       G_SIZE,G_SIZE,0,D_NNZ,0,O_NNZ,petsc_A,IERR )
+!#else
     CALL MatCreateMPIAIJ( PETSC_COMM_WORLD,L_SIZE,L_SIZE, &
        G_SIZE,G_SIZE,0,D_NNZ,0,O_NNZ,petsc_A,IERR )
-#endif
+!#endif
     CALL KSPCreate( PETSC_COMM_WORLD,petsc_ksp,IERR ) 
   END IF
-#ifdef PETSC_3_3
-  call MatSetLocalToGlobalMapping(petsc_A,mapping,mapping,ierr)
-#else
+!#ifdef PETSC_3_3
+!  call MatSetLocalToGlobalMapping(petsc_A,mapping,mapping,ierr)
+!#else
   call MatSetLocalToGlobalMapping(petsc_A,mapping,ierr)
-#endif
+!#endif
 !
 !---  Set PETSc matrix associated with the PETSc linear equation solver
 !     and set PETSc matrix associated with the PETSc preconditioner   ---

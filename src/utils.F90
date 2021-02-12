@@ -497,10 +497,19 @@
          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTSX)
          INDX = 0
          CALL RDUNIT(UNTSX,VARX,INDX)
+!BH
+         IF(ME.EQ.0)WRITE(ISC,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
+         IF(ME.EQ.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
+       ELSE
+         IF(ME.EQ.0)WRITE(ISC,'(2X,3A)') VARB(1:IVR),', ',UNTS
+         IF(ME.EQ.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),', ',UNTS
+!BH
        ENDIF
-       IVR = INDEX( VARB(1:),'  ' ) - 1
-       IF(ME.EQ.0)WRITE(ISC,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
-       IF(ME.EQ.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
+       
+
+!       IVR = INDEX( VARB(1:),'  ' ) - 1
+!       IF(ME.EQ.0)WRITE(ISC,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
+!       IF(ME.EQ.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),', ',UNTSX(1:NCH)
 !
 !---  End of GETUNITX
 !

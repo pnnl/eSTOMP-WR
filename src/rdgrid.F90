@@ -110,31 +110,33 @@
       IF( INDEX(ADUM(1:),'cartesian').NE.0 ) THEN
         IF( INDEX(ADUM(1:),'uniform').NE.0 ) THEN
           ICS = 5
-          if(me.eq.0)WRITE(IWR,'(/,A)') 'Uniform Cartesian Coordinate System'
+          if(me.eq.0)WRITE(IWR,'(/,A)') 'Uniform Cartesian Coordinate'// &
+                                                        ' System'
         ELSE
           ICS = 1
           if(me.eq.0)WRITE(IWR,'(/,A)') 'Cartesian Coordinate System'
         ENDIF
-  ELSEIF( INDEX(ADUM(1:),'cylindrical').NE.0 ) THEN
-    IF( INDEX(ADUM(1:),'uniform').NE.0 ) THEN
-      ICS = 6
-      if(me.eq.0)WRITE(IWR,'(/,A)') 'Uniform Cylindrical Coordinate System'
-    ELSE
-      ICS = 2
-      if(me.eq.0)WRITE(IWR,'(/,A)') 'Cylindrical Coordinate System'
-    ENDIF
-  ELSEIF( INDEX(ADUM(1:),'boundary').NE.0 .OR. &
-    INDEX(ADUM(1:),'fitted').NE.0  .OR. &
-    INDEX(ADUM(1:),'orthogonal').NE.0 ) THEN
-    ICS = 3
-    if(me.eq.0)WRITE(IWR,'(/,A)') 'Orthogonal Boundary Fitted ' // &
-      'Coordinate System'
-  ELSEIF( INDEX(ADUM(1:),'earthvision').NE.0 .AND. &
-    INDEX(ADUM(1:),'sampled').NE.0 ) THEN
-    ICS = 8
-    if(me.eq.0)WRITE(IWR,'(/,A)') 'EarthVision Sampled Input'
-    if(me.eq.0)WRITE(IWR,'(/,A)') 'Orthogonal Boundary Fitted ' // &
-      'Coordinate System'
+      ELSEIF( INDEX(ADUM(1:),'cylindrical').NE.0 ) THEN
+        IF( INDEX(ADUM(1:),'uniform').NE.0 ) THEN
+          ICS = 6
+          if(me.eq.0)WRITE(IWR,'(/,A)') 'Uniform Cylindrical Coordinate'// &
+                                                        ' System'
+        ELSE
+          ICS = 2
+          if(me.eq.0)WRITE(IWR,'(/,A)') 'Cylindrical Coordinate System'
+        ENDIF
+      ELSEIF( INDEX(ADUM(1:),'boundary').NE.0 .OR. &
+        INDEX(ADUM(1:),'fitted').NE.0  .OR. &
+        INDEX(ADUM(1:),'orthogonal').NE.0 ) THEN
+        ICS = 3
+        if(me.eq.0)WRITE(IWR,'(/,A,1X,I1)') 'Orthogonal Boundary &
+                 Fitted Coordinate System, ICS=',ICS
+      ELSEIF( INDEX(ADUM(1:),'earthvision').NE.0 .AND. &
+        INDEX(ADUM(1:),'sampled').NE.0 ) THEN
+        ICS = 8
+        if(me.eq.0)WRITE(IWR,'(/,A)') 'EarthVision Sampled Input'
+        if(me.eq.0)WRITE(IWR,'(/,A)') 'Orthogonal Boundary Fitted ' // &
+          'Coordinate System'
       ELSE
         INDX = 4
         CHMSG = 'Unrecognized Coordinate System Type: ' // ADUM
@@ -221,16 +223,15 @@
        CALL RDINT(ISTART,ICOMMA,CHDUM,upy)
        VARB = 'Number of K-indexed subblock'
        CALL RDINT(ISTART,ICOMMA,CHDUM,upz)
-
       ENDIF
 !
 !---  allocate arrays containing grid boundaries  ---
 !
-     if(ics /=8 ) then
+      if(ics /=8 ) then
       ALLOCATE(X(IFLD+1))
       ALLOCATE(Y(JFLD+1))
       ALLOCATE(Z(KFLD+1))
-     endif
+      endif
 !
 !---  Write coordinate information and compute dimensionality  ---
 !
@@ -295,7 +296,7 @@
         CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
         I = 1
         X(1) = 0.D+0
-       IF(ME.EQ.0)WRITE(IWR,'(2X,A,I4,3A,1PE11.4)')'X(',I,'), ', &
+        IF(ME.EQ.0)WRITE(IWR,'(2X,A,I4,3A,1PE11.4)')'X(',I,'), ', &
           UNTS(1:NCH),': ',X(I)
         IW = 2
         DO 30 I = 2,IFLD+1
@@ -332,10 +333,10 @@
         CALL LCASE( CHDUM )
         IR = IFLD+1-IC
         DO 102 I = 1,IR
-          ICM = INDEX( CHDUM(ISTART:), ',' ) + ISTART - 1
-          IF( ICM.EQ.ISTART-1 ) GOTO 100
+          ICM_ = INDEX( CHDUM(ISTART:), ',' ) + ISTART - 1
+          IF( ICM_.EQ.ISTART-1 ) GOTO 100
           IAT = INDEX( CHDUM(ISTART:), '@' ) + ISTART - 1
-          IF( IAT.LT.ISTART .OR. IAT.GT.ICM ) THEN
+          IF( IAT.LT.ISTART .OR. IAT.GT.ICM_ ) THEN
             IC = IC + 1
             IW = IW + 1
             VARB = 'X Dimension'
@@ -408,7 +409,7 @@
         CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
         J = 1
         Y(1) = 0.D+0
-       IF(ME.EQ.0)WRITE(IWR,'(2X,A,I4,3A,1PE11.4,$)') 'Y(',J,'), ', &
+        IF(ME.EQ.0)WRITE(IWR,'(2X,A,I4,3A,1PE11.4,$)') 'Y(',J,'), ', &
           UNTS(1:NCH),': ',Y(J)
         IW = 2
         DO 120 J = 2,JFLD+1
@@ -509,128 +510,151 @@
   203   CONTINUE
 !---  For generalized coordinates, read grid file  ---
 !   
-  ELSEIF( ICS.EQ.3 .OR. ICS.EQ.8 ) THEN
-    ISTART = 1
-    CALL RDINPL( CHDUM )
-    CALL LCASE( CHDUM ) 
-    VARB = 'External Grid File Name'
-    CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
-    OPEN( UNIT=9,FILE=ADUM(1:NCH),STATUS='OLD',FORM='FORMATTED' )
-    REWIND( UNIT=9 )
-    if(me.eq.0)WRITE(IWR,'(/,3A)') VARB(1:IVR),': ',ADUM(1:NCH)
-    READ(9,*) IFLDX,JFLDX,KFLDX
-    allocate(xbf(ifldx,jfldx,kfldx))
-    xbf = 0.d0
-    allocate(ybf(ifldx,jfldx,kfldx))
-    ybf = 0.d0
-    allocate(zbf(ifldx,jfldx,kfldx))
-    zbf = 0.d0
-    IF( IFLDX.NE.IFLD .OR. JFLDX.NE.JFLD .OR. KFLDX.NE.KFLD ) THEN
-      INDX = 4
-      CHMSG = 'Orthogonal Grid Dimension Conflict'
-      CALL WRMSGS( INDX )
-    ENDIF
-    IF(IFLD.GT.1) THEN
-      READ(9,*)(((XBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
-    ELSE
+      ELSEIF( ICS.EQ.3 .OR. ICS.EQ.8 ) THEN
+!mlr
+        if(me.eq.0) WRITE(IWR,'(A)') ' ICS = 3 or 8 conditional'
+        ISTART = 1
+!        CALL RDINPL( CHDUM )
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!mlr
+        if (me.eq.0) WRITE (IWR,'(A)') CHDUM
+        CALL LCASE( CHDUM ) 
+        VARB = 'External Grid File Name'
+        CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
+        if( me.eq.0) print *,adum
+        OPEN( UNIT=9,FILE=ADUM(1:NCH),STATUS='OLD',FORM='FORMATTED' )
+        REWIND( UNIT=9 )
+        if(me.eq.0)WRITE(IWR,'(/,3A)') VARB(1:IVR),': ',ADUM(1:NCH)
+        READ(9,*) IFLDX,JFLDX,KFLDX
+!mlr
+        IFLDZ = IFLDX
+        JFLDZ = JFLDX
+        KFLDZ = KFLDX
+        IF(IFLDX.GT.1) IFLDZ = IFLDX-1
+        IF(JFLDX.GT.1) JFLDZ = JFLDX-1
+        IF(KFLDX.GT.1) KFLDZ = KFLDX-1
+        IF( IFLDZ.NE.IFLD .OR. JFLDZ.NE.JFLD .OR. KFLDZ.NE.KFLD ) THEN
+          INDX = 4
+          CHMSG = 'Orthogonal Grid Dimension Conflict'
+          CALL WRMSGS( INDX )
+        ENDIF
+        allocate(xbf(ifldx,jfldx,kfldx))
+        xbf = 0.d0
+        allocate(ybf(ifldx,jfldx,kfldx))
+        ybf = 0.d0
+        allocate(zbf(ifldx,jfldx,kfldx))
+        zbf = 0.d0
+!BH        IF(IFLD.GT.1) THEN
+!          READ(9,*)(((XBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
+          READ(9,*)(((XBF(I,J,K),I=1,IFLDX),J=1,JFLDX),K=1,KFLDX)
+!mlr
+!        ELSE
 !
 !---      Two dimensional YZ domain, unit X dimension  ---
 !
 !
-      DO 810 K = 1,KFLD
-      DO 810 J = 1,JFLD
-        XBF(1,J,K) = 0.D+0
-        XBF(2,J,K) = 1.0+0
-    810     CONTINUE
-    ENDIF
-    IF(JFLD.GT.1) THEN
-      READ(9,*)(((YBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
-    ELSE
+!          DO 810 K = 1,KFLDX
+!          DO 810 J = 1,JFLDX
+!            XBF(1,J,K) = 0.D+0
+!            XBF(2,J,K) = 1.0+0
+!  810    CONTINUE
+!        ENDIF
+!        IF(JFLD.GT.1) THEN
+!          READ(9,*)(((YBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
+          READ(9,*)(((YBF(I,J,K),I=1,IFLDX),J=1,JFLDX),K=1,KFLDX)
+!mlr
+!        ELSE
 !
 !---      Two dimensional XZ domain, unit Y dimension  ---
 !
-      DO 820 K = 1,KFLD
-      DO 820 I = 1,IFLD
-        YBF(I,1,K) = 0.D+0
-        YBF(I,2,K) = 1.0+0
-    820     CONTINUE
-    ENDIF
-    IF(KFLD.GT.1) THEN
-      READ(9,*)(((ZBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
-    ELSE
+!          DO 820 K = 1,KFLDX
+!          DO 820 I = 1,IFLDX
+!            YBF(I,1,K) = 0.D+0
+!            YBF(I,2,K) = 1.0+0
+!  820    CONTINUE
+!        ENDIF
+!        IF(KFLD.GT.1) THEN
+!          READ(9,*)(((ZBF(I,J,K),I=1,IFLD),J=1,JFLD),K=1,KFLD)
+          READ(9,*)(((ZBF(I,J,K),I=1,IFLDX),J=1,JFLDX),K=1,KFLDX)
+!mlr
+!        ELSE
 !
 !---      Two dimensional XY domain, unit Z dimension  ---
 !
-      DO 830 J = 1,JFLD
-      DO 830 I = 1,IFLD
-        ZBF(I,J,1) = 0.D+0
-        ZBF(I,J,2) = 1.0+0
-    830     CONTINUE
-    ENDIF
-    CLOSE(UNIT=9)
+!          DO 830 J = 1,JFLDX
+!          DO 830 I = 1,IFLDX
+!            ZBF(I,J,1) = 0.D+0
+!            ZBF(I,J,2) = 1.0+0
+!  830    CONTINUE
+!        ENDIF
+        CLOSE(UNIT=9)
 !
 !---    Single dimensioned orthogonal grid  ---
 !
-    IF( IFLD*JFLD.EQ.1 .OR. JFLD*KFLD.EQ.1 .OR.  &
-      KFLD*IFLD.EQ.1 ) THEN
-      INDX = 4
-      CHMSG = 'Single Dimensioned Orthogonal Grid'
-      CALL WRMSGS( INDX )
-    ENDIF
+        IF( IFLD*JFLD.EQ.1 .OR. JFLD*KFLD.EQ.1 .OR.  &
+          KFLD*IFLD.EQ.1 ) THEN
+          INDX = 4
+          CHMSG = 'Single Dimensioned Orthogonal Grid'
+          CALL WRMSGS( INDX )
+        ENDIF
 !
 !---    For generalized coordinates, only read dimensional units  ---
 !
-    VARB = 'Grid file dimensional units'
-    CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-    if(me.eq.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),': ',UNTS(1:NCH)
-    INDX = 0
-    VARX = 1.D+0
-    IUNM = 1
-    CALL RDUNIT(UNTS,VARX,INDX)
+        VARB = 'Grid file dimensional units'
+        CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+        if(me.eq.0)WRITE(IWR,'(2X,3A)') VARB(1:IVR),': ',UNTS(1:NCH)
+        INDX = 0
+        VARX = 1.D+0
+        IUNM = 1
+        CALL RDUNIT(UNTS,VARX,INDX)
 !
 !---    Unit conversion to meters  ---
 !
-    DO 840 K = 1,KFLD
-    DO 840 J = 1,JFLD
-    DO 840 I = 1,IFLD
-      XBF(I,J,K) = XBF(I,J,K)*VARX
-      YBF(I,J,K) = YBF(I,J,K)*VARX
-      ZBF(I,J,K) = ZBF(I,J,K)*VARX
-    840   CONTINUE
+!mlr        DO 840 K = 1,KFLD
+!        DO 840 J = 1,JFLD
+!        DO 840 I = 1,IFLD
+        DO 840 K = 1,KFLDX
+        DO 840 J = 1,JFLDX
+        DO 840 I = 1,IFLDX
+          XBF(I,J,K) = XBF(I,J,K)*VARX
+          YBF(I,J,K) = YBF(I,J,K)*VARX
+          ZBF(I,J,K) = ZBF(I,J,K)*VARX
+  840  CONTINUE
 !
 !---    Single-dimensioned in the z-direction  ---
 !
-    IF( KFLD.EQ.1 ) THEN
-      DO 842 J = 1,JFLD
-      DO 842 I = 1,IFLD
-        XBF(I,J,2) = XBF(I,J,1)
-        YBF(I,J,2) = YBF(I,J,1)
-    842     CONTINUE
-    ENDIF
+        IF( KFLD.EQ.1 ) THEN
+          DO 842 J = 1,JFLD
+          DO 842 I = 1,IFLD
+            XBF(I,J,2) = XBF(I,J,1)
+            YBF(I,J,2) = YBF(I,J,1)
+  842    CONTINUE
+        ENDIF
 !
 !---    Single-dimensioned in the y-direction  ---
 !
-    IF( JFLD.EQ.1 ) THEN
-      DO 844 K = 1,KFLD
-      DO 844 I = 1,IFLD
-        XBF(I,2,K) = XBF(I,1,K)
-        ZBF(I,2,K) = ZBF(I,1,K)
-    844     CONTINUE
-    ENDIF
+        IF( JFLD.EQ.1 ) THEN
+          DO 844 K = 1,KFLD
+          DO 844 I = 1,IFLD
+            XBF(I,2,K) = XBF(I,1,K)
+            ZBF(I,2,K) = ZBF(I,1,K)
+  844    CONTINUE
+        ENDIF
 !
 !---    Single-dimensioned in the x-direction  ---
 !
-    IF( IFLD.EQ.1 ) THEN
-      DO 846 K = 1,KFLD
-      DO 846 J = 1,JFLD
-        YBF(2,J,K) = YBF(1,J,K)
-        ZBF(2,J,K) = ZBF(1,J,K)
-    846     CONTINUE
-    ENDIF
-    IF(IFLD.GT.1) IFLD = IFLD-1
-    IF(JFLD.GT.1) JFLD = JFLD-1
-    IF(KFLD.GT.1) KFLD = KFLD-1
-  ENDIF
+        IF( IFLD.EQ.1 ) THEN
+          DO 846 K = 1,KFLD
+          DO 846 J = 1,JFLD
+            YBF(2,J,K) = YBF(1,J,K)
+            ZBF(2,J,K) = ZBF(1,J,K)
+  846    CONTINUE
+        ENDIF
+        !mlr
+        !IF(IFLD.GT.1) IFLD = IFLD-1
+        !IF(JFLD.GT.1) JFLD = JFLD-1
+        !IF(KFLD.GT.1) KFLD = KFLD-1
+      ENDIF
 !
 !---  Write coordinate information and compute dimensionality  ---
 !
@@ -640,46 +664,47 @@
 !        CHMSG = 'Minimum Coplanar Nodes > Parameter LMNP'
 !        CALL WRMSGS( INDX )
 !      ENDIF
-  if(me.eq.0)WRITE (IWR,'(/,A)') 'Coordinate System Dimensions'
-  if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of I-indexed Nodes:   ',IFLD
-  if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of J-indexed Nodes:   ',JFLD
-  if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of K-indexed Nodes:   ',KFLD
-  NDIM = 0
-  IF( IFLD.GT.1 ) NDIM = NDIM+1
-  IF( JFLD.GT.1 ) NDIM = NDIM+1
-  IF( KFLD.GT.1 ) NDIM = NDIM+1
+!mlr      if(me.eq.0)WRITE (IWR,'(/,A)') 'Coordinate System Dimensions'
+!      if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of I-indexed Nodes:   ',IFLD
+!      if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of J-indexed Nodes:   ',JFLD
+!      if(me.eq.0)WRITE (IWR,'(2X,A,I6)') 'Number of K-indexed Nodes:   ',KFLD
 
+      NDIM = 0
+      IF( IFLD.GT.1 ) NDIM = NDIM+1
+      IF( JFLD.GT.1 ) NDIM = NDIM+1
+      IF( KFLD.GT.1 ) NDIM = NDIM+1
 
-  IF( NDIM.LT.1 ) NDIM = 1
-  MDX = 0
-  IF( KFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(1) = MDX
-  ENDIF
-  IF( JFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(2) = MDX
-  ENDIF
-  IF( IFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(3) = MDX
-  ENDIF
-  IF( IFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(4) = MDX
-  ENDIF
-  IF( JFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(5) = MDX
-  ENDIF
-  IF( KFLD.GT.1 ) THEN
-    MDX = MDX+1
-    MDIM(6) = MDX
-  ENDIF
-  IJFLD = IFLD*JFLD
-  JKFLD = JFLD*KFLD
-  KIFLD = KFLD*IFLD
-  NFLD  = IJFLD*KFLD
+      IF( NDIM.LT.1 ) NDIM = 1
+      MDX = 0
+      IF( KFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(1) = MDX
+      ENDIF
+      IF( JFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(2) = MDX
+      ENDIF
+      IF( IFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(3) = MDX
+      ENDIF
+      IF( IFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(4) = MDX
+      ENDIF
+      IF( JFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(5) = MDX
+      ENDIF
+      IF( KFLD.GT.1 ) THEN
+        MDX = MDX+1
+        MDIM(6) = MDX
+      ENDIF
+      IJFLD = IFLD*JFLD
+      JKFLD = JFLD*KFLD
+      KIFLD = KFLD*IFLD
+      NFLD  = IJFLD*KFLD
+!        write(*,*) 'IJFLD,JKFLD,KIFLD,NFLD',IJFLD,JKFLD,KIFLD,NFLD
 !
 !---  Third coordinate direction  ---
 !
@@ -799,6 +824,9 @@
       !
       !---  Write grid to an external file --
       !
+!      write(*,*) 'ME:',me,'XBF:',XBF
+     
+      IWRGRD = 1
       IF( IWRGRD.EQ.1 ) THEN
          if (me .eq. 0) then
             OPEN( UNIT=26,FILE='grid',STATUS='UNKNOWN',FORM='FORMATTED' )
@@ -806,9 +834,16 @@
             JFLD1 = JFLD+1
             KFLD1 = KFLD+1
             WRITE(26,*) IFLD1,JFLD1,KFLD1
-            WRITE(26,*)(X(I),I=1,IFLD1)
-            WRITE(26,*)(Y(I),I=1,JFLD1)
-            WRITE(26,*)(Z(I),I=1,KFLD1)
+!BH
+                if (ics .eq.3 .or. ics.eq.8) then
+                        WRITE(26,*)'XBF',(((XBF(I,J,K),I=1,IFLD1),J=1,JFLD1),K=1,KFLD1)
+                        WRITE(26,*)'YBF',(((YBF(I,J,K),I=1,IFLD1),J=1,JFLD1),K=1,KFLD1)
+                        WRITE(26,*)'ZBF',(((ZBF(I,J,K),I=1,IFLD1),J=1,JFLD1),K=1,KFLD1)
+                else
+                        WRITE(26,*)(X(I),I=1,IFLD1)
+                        WRITE(26,*)(Y(I),I=1,JFLD1)
+                        WRITE(26,*)(Z(I),I=1,KFLD1)
+                endif
             CLOSE(UNIT=26)
          endif
       ENDIF
@@ -847,3 +882,6 @@
       DEALLOCATE(MDIM)
       RETURN
       END
+	  
+	  
+

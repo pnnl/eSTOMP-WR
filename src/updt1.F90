@@ -80,7 +80,7 @@
 !----------------------Parameter Statements----------------------------!
 !
 
-
+      LOGICAL :: use_ga
 
 !
 !----------------------Common Blocks-----------------------------------!
@@ -124,8 +124,10 @@
           DPL = ABS( CPGL-PG(2,N)+PL(2,N) )
           DPL = MIN( DPL,ABS(blu(ieqw,n)) )
           DPL = SIGN( DPL,blu(ieqw,n) )*RLXF
+!        if(N==52003)  write(*,*) '000 DPL',DPL
         ELSE
           DPL = blu(ieqw,n)*RLXF
+!        if(N==52003)  write(*,*) '111 DPL',DPL
         ENDIF
         pllx = 0.d0
 !
@@ -134,31 +136,37 @@
 !
         IF( PG(2,N)-PL(2,N)-PAE.GT.ZERO .AND. &
           PG(2,N)-PL(2,N)-PAE-DPL.LT.ZERO ) DPL = 6.D-1*DPL
+!       if(N==52003) write(*,*) '222 DPL',DPL
         PL(2,N) = PL(2,N) + DPL
 !
 !---  Check for excessive aqueous pressure  ---
 !
+        nlwx = 0  ! Yilin/BH
         IF(pl(2,n).gt.pmx-patm) THEN
           pllx = pl(2,n)
           plwx = pllx
-          nlwx = n
+        !  nlwx = n
+          nlwx = loc2nat(n)
           exit
         ENDIF
   200 CONTINUE    
-      nlwx =0
+!      nlwx =0
       call ga_dgop(1,pllx,1,'max')
       n = 0        
-      if(pllx.eq.plwx) n = loc2nat(nlwx)
+!      if(pllx.eq.plwx) n = loc2nat(nlwx)
+       if(pllx.eq.plwx) n = nlwx
       call ga_igop(1,n,1,'max')
-!
+
         IF( PLlx.GT.PMX-PATM ) THEN
           ICNV = 1
           if(me.eq.0)WRITE(ISC,'(10X,A)')'---  Primary Variable(s) Error  ---'
           if(me.eq.0)WRITE(IWR,'(10X,A)')'---  Primary Variable(s) Error  ---'
           if(me.eq.0)WRITE(ISC,'(4X,A,1PE12.5,A,I6)') &
-          'Water Pressure = ',PL(2,N)+PATM,' Node = ',N
+!          'Water Pressure = ',PL(2,N)+PATM,' Node = ',N
+           'Water Pressure = ',pllx+PATM,' Node = ',N
           if(me.eq.0)WRITE(IWR,'(4X,A,1PE12.5,A,I6)') &
-          'Water Pressure = ',PL(2,N)+PATM,' Node = ',N
+           'Water Pressure = ',pllx+PATM,' Node = ',N
+!          'Water Pressure = ',PL(2,N)+PATM,' Node = ',N
 !          GOTO 300
         ENDIF
 !  200 CONTINUE

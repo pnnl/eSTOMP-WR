@@ -82,6 +82,7 @@
       CHARACTER*6 FORM
       CHARACTER*4 FORM1
       LOGICAL T_OK
+      LOGICAL :: use_ga
 !
 !----------------------Data Statements---------------------------------!
 !
@@ -277,6 +278,14 @@
           GOTO 200
   150     CONTINUE
         ENDIF
+        IF( INDEX( ADUM(1:),'ph').NE.0) THEN
+          SPNM = 'H+'
+          DO M = 1,NSPL
+            NSP = M
+            IF( SPNM.EQ.SPNML(M) ) EXIT
+          ENDDO
+        ENDIF
+
         IF( INDEX(ADUM(1:),'aqueous pressure').NE.0 ) THEN
           IREF(NV) = 1
         ELSEIF( INDEX(ADUM(1:),'gas pressure').NE.0 ) THEN
@@ -549,6 +558,7 @@
           INDX = 400+(NSOLU*33)+((NEQC+NEQK)*33)+(NSP-1)*33 + 27
           IREF(NV) = INDX
           CHREF(INDX) = 'pH'
+          UNREF(INDX) = 'null'
         ELSE
           INDX = 4
           CHMSG = 'Unrecognized Reference Node Variable: '//ADUM
@@ -678,6 +688,13 @@
           NVC = NVC -1
           GOTO 400
   350     CONTINUE
+        ENDIF
+        IF( INDEX( ADUM(1:),'ph').NE.0) THEN
+          SPNM = 'H+'
+          DO M = 1,NSPL
+            NSP = M
+            IF( SPNM.EQ.SPNML(M) ) EXIT
+          ENDDO
         ENDIF
 
         IF( INDEX(ADUM(1:),'final restart').NE.0 ) THEN

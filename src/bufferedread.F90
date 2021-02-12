@@ -1,4 +1,3 @@
-!< 
 !! Module to use an in memory buffer to process a input file comprised of "cards" where
 !! cards are defined as starting with ~.
 !!
@@ -19,7 +18,7 @@ module bufferedread
   implicit none
 
   integer MAX_CARDS, MAX_STRLEN, CARD_BUFLEN, MAX_LINES
-  parameter (MAX_CARDS=100, MAX_STRLEN=512, CARD_BUFLEN=1000)
+  parameter (MAX_CARDS=100, MAX_STRLEN=1024, CARD_BUFLEN=1000)
   character(MAX_STRLEN), allocatable :: input_lines(:)
   character(MAX_STRLEN), allocatable :: extfile(:)
   character(MAX_STRLEN) card_name(MAX_CARDS)

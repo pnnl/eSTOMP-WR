@@ -118,6 +118,7 @@ SUBROUTINE STOMP1
       REAL(KIND=8), dimension(:), allocatable  :: sbuf, tbuf
       REAL :: m3tol
       integer :: stat(MPI_STATUS_SIZE)
+      LOGICAL :: use_ga
 !--- END E4D Local Vars
 #endif
 !
@@ -544,7 +545,7 @@ average_time =average_time+t_e-t_b
 !
 !---  Inverse output  ---
 !
-!      IF( ISLC(20).EQ.1 .AND. ABS(TMOB-TM)/EPSL.LT.EPSL ) CALL WROBDA
+      IF( ISLC(20).EQ.1 .AND. ABS(TMOB-TM)/EPSL.LT.EPSL ) CALL WROBDA
 !
 !---  Compute the next time step and increment time step counter  ---
 !
@@ -930,14 +931,14 @@ eckechem_time = eckechem_time+t_ek-t_bk
 !
 !---  Inverse output  ---
 !
-!      IF( ISLC(20).EQ.1 ) THEN
-!        IF( ABS(TMOB-TM)/EPSL.LT.EPSL ) CALL WROBDA
-!        IF( FLG_EXT ) WRITE(IOBDEF,'(A,/)') 'END'
-!        IF( FLG_UNI ) WRITE(IOBDUF,'(A,/)') 'END'
-!      ENDIF
-!      if(me.eq.0) WRITE(IWR,'(/,A)') '---  End of STOMP Simulation  ---'
-!      if(me.eq.0) WRITE(ISC,'(/,A)') '---  End of STOMP Simulation  ---'
-!      CALL WRCVS
+      IF( ISLC(20).EQ.1 ) THEN
+        IF( ABS(TMOB-TM)/EPSL.LT.EPSL ) CALL WROBDA
+        IF( FLG_EXT .and. me == 0) WRITE(IOBDEF,'(A,/)') 'END'
+        IF( FLG_UNI .and. me == 0) WRITE(IOBDUF,'(A,/)') 'END'
+      ENDIF
+      if(me.eq.0) WRITE(IWR,'(/,A)') '---  End of STOMP Simulation  ---'
+      if(me.eq.0) WRITE(ISC,'(/,A)') '---  End of STOMP Simulation  ---'
+   !   CALL WRCVS
 
    t_te= MPI_Wtime()
    stomp_time=t_te-t_tb

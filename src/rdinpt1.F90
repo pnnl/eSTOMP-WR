@@ -396,6 +396,17 @@
         IF( ME.EQ.0 ) CALL WRMSGS( INDX )
       ENDIF
 !
+!---  Search input file for observed data card --
+!
+      IF( BUFFEREDREAD_FIND( '~observed' ) )THEN
+        CALL RDOBDA
+      ELSE
+        INDX = 1
+        CHMSG = 'Missing Observed Data Card'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+      ENDIF
+
+!
 !---  Free up memory
 !
       T_OK = BUFFEREDREAD_TERM()

@@ -387,7 +387,7 @@
       integer idx,ldim, dim1,dim2, iflg, dflg
       character*64 t_string
       character*64 varname
-
+      LOGICAL :: use_ga
 
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
 !
@@ -464,14 +464,21 @@
       WRITE(IPL,'(A,//)')' Welcome to ...'
       WRITE(IPL,'(A)')   '                           eSTOMP'
       WRITE(IPL,'(A,//)')'                   A scalable version of'
-      WRITE(IPL,'(A,//)')'        Subsurface Transport Over Multiple Phases'
-      WRITE(IPL,'(A)')   ' This file was produced by eSTOMP, a derivative work of STOMP.'
-      WRITE(IPL,'(A)')   ' STOMP was developed by the Pacific Northwest Laboratory, with'
-      WRITE(IPL,'(A)')   ' support from the VOC-Arid Integrated Demonstration Project,'
-      WRITE(IPL,'(A)')   ' Office of Technology Development, U.S. Department of Energy.'
-      WRITE(IPL,'(A)')   ' Results from this version of STOMP should not be used for'
+      WRITE(IPL,'(A,//)')'        Subsurface Transport Over Multiple &
+                                                                Phases'
+      WRITE(IPL,'(A)')   ' This file was produced by eSTOMP, a &
+                                              derivative work of STOMP.'
+      WRITE(IPL,'(A)')   ' STOMP was developed by the Pacific &
+                                         Northwest Laboratory, with'
+      WRITE(IPL,'(A)')   ' support from the VOC-Arid Integrated &
+                                                 Demonstration Project,'
+      WRITE(IPL,'(A)')   ' Office of Technology Development, U.S. &
+                                                  Department of Energy.'
+      WRITE(IPL,'(A)')   ' Results from this version of STOMP should &
+                                                        not be used for'
       WRITE(IPL,'(A,/)') ' license related applications.'
-      WRITE(IPL,'(A,/)') ' For inquiries or assistance:  Call (509) 372-4067'
+      WRITE(IPL,'(A,/)') ' For inquiries or assistance: &
+                                                  Call (509) 372-4067'
       WRITE(IPL,'(A,//)')'                        ---  PLOT  ---'
 
       WRITE(IPL,'(2A)') 'Version: ',CH_VRSN
@@ -497,8 +504,8 @@
       TWK = TDAY/7.
       TYR = TDAY/365.25
 
-      WRITE(IPL,'(A,6(1PE13.6,A))') 'Time = ',TM,',s ',TMIN,',min ',THR, &
-       ',h ',TDAY,',day ',TWK,',wk ',TYR,',yr '
+      WRITE(IPL,'(A,6(1PE13.6,A))') 'Time = ',TM,',s ',TMIN,',min ', &
+        THR,',h ',TDAY,',day ',TWK,',wk ',TYR,',yr '
 
       WRITE(IPL,'(/,A,I6)') 'Number of X or R-Direction Nodes = ',nxdim
       WRITE(IPL,'(A,I6)') 'Number of Y or Theta-Direction Nodes = ',nydim
@@ -511,7 +518,7 @@
 !
 !---  Variable depth and thickness coordinate system  ---
 !
-      IF( ICS.EQ.3 .OR. ICS.EQ.11 .OR. ICS.EQ.12 ) THEN
+      IF( ICS.EQ.3 .OR. ICS.EQ.11 .OR. ICS.EQ.12 .OR.ICS.EQ.8 ) THEN
         IF( ICS.EQ.3 ) THEN
           WRITE(IPL,'(3A,1PE16.9)') 'X Origin -- Hexahedra Points'
           WRITE(IPL,'(3A,1PE16.9)') 'Y Origin -- Hexahedra Points'
@@ -527,6 +534,16 @@
 !        WRITE(IPL,FORM2) (((VAR*Y(I,J,K),I=1,IFLD+1),J=1,JFLD+1),K=1,KFLD+1)
 !!        WRITE(IPL,'(/,2A)') 'Z-Direction Surface Positions, ',UNLN(1:IDB)
 !        WRITE(IPL,FORM2) (((VAR*Z(I,J,K),I=1,IFLD+1),J=1,JFLD+1), K=1,KFLD+1)        
+
+        WRITE(IPL,'(/,2A)') 'X-Direction Node Positions, ',UNLN(1:IDB)
+        WRITE(IPL,FORM2) (((xbf(I,J,K),I=1,nxdim+1),J=1,nydim+1),&
+                                                         K=1,nzdim+1) !BH
+        WRITE(IPL,'(/,2A)') 'Y-Direction Node Positions, ', UNLN(1:IDB)
+        WRITE(IPL,FORM2) (((ybf(I,J,K),I=1,nxdim+1),J=1,nydim+1),&
+                                                         K=1,nzdim+1) !BH
+        WRITE(IPL,'(/,2A)') 'Z-Direction Node Positions, ', UNLN(1:IDB)
+        WRITE(IPL,FORM2) (((zbf(I,J,K),I=1,nxdim+1),J=1,nydim+1),&
+                                                         K=1,nzdim+1) !BH
         GOTO 20
       ENDIF
 !      IF( ICS.EQ.2 ) THEN
@@ -565,6 +582,12 @@
       ! Currently not included in parallel I/O
       ! Vicky said volume is not usually used.
       ! Also they actually get dumped with the data anyway except volume
+
+      20 CONTINUE 
+      ! Add the if condition to make sure all cores are doing the same
+      ! Before this only proc 0 is working; after this, all procs are
+      ! working - BH
+      IF( ICS.NE.3 .AND. ICS.NE.11 .AND. ICS.NE.12 .AND.ICS.NE.8 ) THEN
       IDB = INDEX( UNLN(1:),'  ') - 1
       varname = 'X-Direction Node Positions'
       dim1 = 0
@@ -618,12 +641,14 @@
       avar = 0.d0
       call write_var(varname,UNLN(1:IDB),iflg,dflg,idx,ldim,dim1,dim2,var,avar,me,ipl,form2,0)
 #endif
-
-   20 CONTINUE
+      ENDIF ! BH
+!   20 CONTINUE
       varname = "Node Volume"
       iunm = 1
       IDB = INDEX( UNLN(1:),'  ') - 1
-!      VAR = 1.D+0
+      VAR = 1.D+0
+      INDX = 4
+      CALL RDUNIT(UNLN,VAR,INDX)
       iflg = 0
       dflg = 1
       ldim = 1
@@ -708,9 +733,11 @@
             do n=1,num_nodes
               varp_tmp(n) = c(nsl,n)*yl(nsl,n)/(sl(2,n)*pord(2,n)+small)
               if(islc(40).eq.1) then
-                if(nsl.gt.nsolu.and.immb(nsl-nsolu).ne.1) then
+!                if(nsl.gt.nsolu.and.immb(nsl-nsolu).ne.1) then !BH
+                 if(nsl.gt.nsolu) then  !BH
                   neq = nsl-nsolu
-                  if(neq<=neqc) then
+                  if (immb(neq).ne.1) then  !BH
+                   if(neq<=neqc) then
                     varx = 0.d0
                     DO  M = 1,IEQ_C(1,NEQ)
                       NSP = IEQ_C(M+1,NEQ)
@@ -724,7 +751,8 @@
                     varx = varx*YL(NSL,N)/(SL(2,N)*PORD(2,N))
                     varp_tmp(n) = varx
                   endif
-                endif
+                 endif
+                endif !BH
               endif
             enddo
             iflg = 0
@@ -1547,7 +1575,7 @@
 
 
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
-
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -1838,7 +1866,7 @@
 
 
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR,VAR1,VAR2,VAR3
-
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2050,6 +2078,7 @@
       integer ldim, dim1,dim2,idx,iflg,dflg
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
       logical t_ok
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2225,6 +2254,7 @@
       integer ldim, dim1,dim2,idx,iflg,dflg
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
       logical t_ok
+      LOGICAL :: use_ga
 
 !
 !----------------------Common Blocks-----------------------------------!
@@ -2406,6 +2436,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2531,6 +2562,7 @@
       integer idx,ldim, dim1,dim2, iflg, dflg
       character*64 t_string
       character*64 varname
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2700,6 +2732,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2823,6 +2856,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -2946,6 +2980,7 @@
       CHARACTER*16 FORM
       integer idx,ldim, dim1,dim2, iflg, dflg
       logical t_ok
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3088,7 +3123,7 @@
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
       integer ldim, dim1,dim2,idx,iflg,dflg
       logical t_ok
-
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3234,6 +3269,7 @@
       integer isio ! status from io calls
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
       logical t_ok
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3379,6 +3415,7 @@
 
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+         LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3503,6 +3540,7 @@
       character*64 varname
       integer ldim, dim1,dim2,idx,iflg,dflg
       logical t_ok
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3658,6 +3696,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3779,6 +3818,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -3902,6 +3942,7 @@
       CHARACTER*64 varname
       integer ldim, dim1,dim2,idx,iflg,dflg
       logical t_ok
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -4052,6 +4093,7 @@
 !
       CHARACTER*16 FORM
       INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+       LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -4163,7 +4205,7 @@
 
 
       REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
-
+      LOGICAL::use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -4197,7 +4239,7 @@
 
 
 
-subroutine string2idx(ldim,iflg,dflg,t_string,idx,t_ok)
+      subroutine string2idx(ldim,iflg,dflg,t_string,idx,t_ok)
   use grid_mod
   implicit none
 !

@@ -92,6 +92,7 @@
       REAL*8 BCX(LSPBC+1)
       double precision :: s_fx_up(3),s_area_x(3)
       LOGICAL :: ISJCB
+      LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -359,8 +360,18 @@
             aux = abs(u_x)
             avx = abs(u_y)
             awx = abs(u_z)
-            dplb = (displx*(ulbsq*aux+vlbsq*avx+wlbsq*awx) + &
-             disptx*(ulbsq+vlbsq+wlbsq-(ulbsq*aux+vlbsq*avx+wlbsq*awx)))/(zvb+small)
+!BH
+            disptvx = disptv(izn)  !BH
+            IF (aux.EQ.1 .AND. avx.EQ.0 .AND.awx.EQ.0) THEN
+                    dplb = (displx * ulbsq + disptx * vlbsq + disptvx *wlbsq)/(zvb+small)
+            ELSEIF (aux.EQ.0 .AND. avx.EQ.1 .AND.awx.EQ.0) THEN
+                    dplb = (displx * vlbsq + disptx * ulbsq + disptvx *wlbsq)/(zvb+small)
+            ELSEIF (aux.EQ.0 .AND. avx.EQ.0 .AND.awx.EQ.1) THEN
+                    dplb = (displx * wlbsq + disptvx * ulbsq + disptvx *vlbsq)/(zvb+small)
+            ENDIF
+!                dplb = (displx*(ulbsq*aux+vlbsq*avx+wlbsq*awx) + &
+!                        disptx*(ulbsq+vlbsq+wlbsq-(ulbsq*aux+vlbsq*avx+wlbsq*awx)))/(zvb+small)
+!BH
             DPLB = DPLB*SMDEF(NSL,IZN)
         ELSE
             DPLB = 0.D+0

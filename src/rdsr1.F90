@@ -85,6 +85,7 @@
   integer, allocatable :: isrdmw2(:,:)
   integer :: lo(3),hi(3),ldim(3),dims(3)
   logical :: status, t_ok
+  LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !

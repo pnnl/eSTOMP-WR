@@ -41,7 +41,8 @@ ifeq ($(findstring constance,$(SYSTEM)),constance)
 #  DEBUG_FLAG = -g 
 #  DEBUG_FLAG = -g -traceback -fpe:0 -check all 
 #  OPTIMIZE_FLAG = #-fast -O2
-   OPTIMIZE_FLAG = -O2 -fp-model precise
+#   OPTIMIZE_FLAG = -O2 -fp-model precise
+   OPTIMIZE_FLAG = -g 
    FCFLAGS =  $(DEBUG_FLAG) $(OPTIMIZE_FLAG) -r8 #-fPIC 
    FLINKER = mpif90 
    CPP = cpp
@@ -348,7 +349,8 @@ FOBJS =   \
           cflux1.o\
           cbnd1.o\
           sfxlb.o\
-          sfxl.o 
+          sfxl.o\
+          ucode1.o 
 
 
 

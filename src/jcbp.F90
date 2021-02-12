@@ -70,7 +70,7 @@ SUBROUTINE JCBP
   integer idx,slen,nlen
   logical t_ok
   character (len=64) :: t_string
-
+  LOGICAL :: use_ga
 
 !
 !----------------------Common Blocks-----------------------------------!

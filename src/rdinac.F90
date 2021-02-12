@@ -125,7 +125,6 @@
       IF( INDEX(ADUM,'multiple').NE.0 ) THEN
         VARB = 'Number of Entries'
         CALL RDINT(ISTART,ICOMMA,CHDUM,NDOM)
-        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
       ENDIF
 !
 !---  Define inactive nodes  ---
@@ -244,13 +243,13 @@
             CALL NGA_SCATTER(G_BUF,VAL_BUF(1),IDX_BUF(1,1),NCOUNT)
             NCOUNT = 0
           ENDIF
-          LXP = 1
-          T_OK = COPYNDFLD( G_BUF,IXP,LDXX,LO,HI,LXP  )
           CLOSE(UNIT=27)
           DEALLOCATE(VAL_BUF)
           DEALLOCATE(IDX_BUF)
         ENDIF
-        CALL GA_SYNC
+        LXP = 1
+        T_OK = COPYNDFLD( G_BUF,IXP,LDXX,LO,HI,LXP  )
+!        CALL GA_SYNC
       ELSE
 !
 !---  Read inactive node information from the input file  ---

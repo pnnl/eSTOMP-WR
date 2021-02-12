@@ -92,6 +92,7 @@
       REAL*8 BCX(LSPBC+1)
       double precision :: s_fx_up(3),s_area_x(3)
       LOGICAL :: ISJCB
+      LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !

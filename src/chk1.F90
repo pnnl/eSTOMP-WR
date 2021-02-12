@@ -94,6 +94,7 @@
 !----------------------Type Declarations-------------------------------!
 !
       EXTERNAL SCALING
+      LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !

@@ -74,6 +74,7 @@
       LOGICAL FCHK
       EXTERNAL I_COUNT
       LOGICAL T_OK
+      LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -146,6 +147,15 @@
         CHMSG = 'Reading Surface Flux Card in STEP'
         IF( ME.EQ.0 ) CALL WRMSGS( INDX )
         CALL RD_SF
+      ENDIF
+!
+!---  Search input file for observed data card --
+!
+      IF(  BUFFEREDREAD_FIND( '~observed' ) )THEN
+        INDX = 1
+        CHMSG = 'Reading Observed Data Card in STEP'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+        CALL RD_OBDA
       ENDIF
 !
 !---  Search input file for aqueous species card --
@@ -3618,6 +3628,189 @@
 !
       RETURN
       END
+!
+      SUBROUTINE RD_OBDA
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------Copyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Read Observed Data Card for parameters.
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by MD White, PNNL, 27 November 2002.
+!     Last Modified by MD White, PNNL, 27 November 2002.
+!     $Id: step.F 1067 2016-05-16 18:20:42Z d3c002 $
+!
+!----------------------Fortran 90 Modules------------------------------!
+!
+      USE TRNSPT
+      USE TABL
+      USE SOURC
+      USE SOLTN
+      USE PORMED
+      USE OUTPU
+      USE GRID
+      USE FILES
+      USE BCV
+      USE GLB_PAR
+      USE BUFFEREDREAD
+!
+!----------------------Implicit Double Precision-----------------------!
+!
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+!
+!----------------------Type Declarations-------------------------------!
+!
+      CHARACTER*128 ADUM,CDUM,FDUM
+      CHARACTER*512 CHDUM
+      REAL*8 R_OBDSX(2)
+      LOGICAL FLG_CHK, T_OK
+!
+!----------------------Executable Lines--------------------------------!
+!
+!      ISUB_LOG = ISUB_LOG+1
+!      SUB_LOG(ISUB_LOG) = '/RD_OBDA'
+!
+!---  Assign card string  ---
+!
+      CARD = 'Observed-Data Card'
+!
+!---  Read number of observed-data types  ---
+!
+      T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+      CALL LCASE( CHDUM )
+      ISTART = 1
+      VARB = 'Number of Observed-Data Types'
+      CALL RD_INT(ISTART,ICOMMA,CHDUM,NOBDTX)
+      LOBDT = MAX( LOBDT,NOBDTX )
+!mlr
+!      print*,'RD_OBDA in STEP'
+!      print*,'LOBDT=',LOBDT
+!mlr
+      NSF = LSF
+!
+!---  Loop over the number of observed-data types  ---
+!
+      DO 300 NT = 1,NOBDTX
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        CALL LCASE( CHDUM )
+        ISTART = 1
+        VARB = 'Observed-Data Type'
+        CALL RD_CHR( ISTART,ICOMMA,NCH,CHDUM,ADUM )
+!
+!---  Surface-rate-observation variable  ---
+!
+        IF( INDEX(ADUM(1:),'surface').NE.0 .AND. &
+         ( INDEX(ADUM(1:),'rate').NE.0 .OR. &
+         INDEX(ADUM(1:),'flux').NE.0 ) ) THEN
+          NSF = NSF + 1
+          LSF = MAX( LSF,NSF )
+!
+!---  Surface-integral-observation variable  ---
+!
+        ELSEIF( INDEX(ADUM(1:),'surface').NE.0 .AND. &
+         INDEX(ADUM(1:),'integral').NE.0 ) THEN
+          NSF = NSF + 1
+          LSF = MAX( LSF,NSF )
+        ENDIF
+!
+!---    Read number of observed data samples
+!       or an external file name  ---
+!
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        CALL LCASE( CHDUM )
+        ISTART = 1
+!
+!---    Read observed-data samples from an external file  ---
+!
+        IF( INDEX( CHDUM(1:),'file').NE.0 ) THEN
+          VARB = 'Observed-Data External File Name'
+          CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
+          CALL RD_CHR(ISTART,ICOMMA,NCHF,CHDUM,FDUM)
+!
+!---      Check that external file exists  ---
+!
+          INQUIRE( FILE=FDUM(1:NCHF), FORM=CDUM, EXIST=FLG_CHK )
+          IF( .NOT.FLG_CHK ) THEN
+            INDX = 4
+            CHMSG = 'Missing Observed-Data External File: ' &
+             // FDUM(1:NCHF)
+            CALL WRMSGS( INDX )
+          ELSEIF( CDUM.EQ.'UNFORMATTED' ) THEN
+            INDX = 4
+            CHMSG = 'Unformatted Observed-Data External File: ' &
+             // FDUM(1:NCHF)
+            CALL WRMSGS( INDX )
+          ENDIF
+          OPEN(UNIT=27,FILE=FDUM(1:NCHF),STATUS='OLD',FORM='FORMATTED')
+          NS = 0
+  100     READ(27,'(A)',END=110) CHDUM
+          IF( CHDUM(1:1).EQ.'#' .OR. CHDUM(1:1).EQ.'!' ) GOTO 100
+          BACKSPACE(27)
+          NS = NS + 1
+          LOBDS = MAX( LOBDS,NS )
+          READ(27,*,END=110) R_OBDSX(2),R_OBDSX(1)
+          GOTO 100
+  110     CONTINUE
+          CLOSE(UNIT=27)
+          GOTO 300
+        ENDIF
+!
+!---    Read observed-data samples from input file  ---
+!
+        VARB = 'Number of Observed Data Samples'
+        CALL RD_INT(ISTART,ICOMMA,CHDUM,NOBDSX)
+        LOBDS = MAX( LOBDS,NOBDSX )
+!mlr
+!        print*,'LOBDS=',LOBDS
+!mlr
+!
+!---    Loop over number of observed data samples  ---
+!
+        DO 200 NS = 1,NOBDSX
+          ISTART = 1
+          T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+          CALL LCASE( CHDUM )
+  200   CONTINUE
+  300 CONTINUE
+!
+!---  Reset subroutine name  ---
+!
+!      ISUB_LOG = ISUB_LOG-1
+!
+!---  End of RD_OBDA group
+!
+      RETURN
+      END
+
 
 !----------------------Subroutine--------------------------------------!
 !

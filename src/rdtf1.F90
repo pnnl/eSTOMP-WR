@@ -117,6 +117,7 @@
       CARD = 'Solute/Fluid Interaction Card'
       ICD = INDEX( CARD,'  ' )-1
       if(me.eq.0) WRITE(ISC,'(//,3A)') ' ~ ',CARD(1:ICD),': '
+      if(me.eq.0) WRITE(IWR,'(//,3A)') ' ~ ',CARD(1:ICD),': '
 !
 !---  Read number of different solutes  ---
 !
@@ -166,6 +167,7 @@
         NSL = NSOLU
   110   CONTINUE
         if(me.eq.0) WRITE(ISC,'(/,3A)') VARB(1:IVR),': ',ADUM
+        if(me.eq.0) WRITE(IWR,'(/,3A)') VARB(1:IVR),': ',ADUM
 !
 !---  Aqueous effective diffusion option  ---
 !
@@ -174,38 +176,51 @@
         IDFLT = 1
         CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
         if(me.eq.0) WRITE( ISC,'(/,A,$)' ) VARB(1:IVR)
+        if(me.eq.0) WRITE( IWR,'(/,A,$)' ) VARB(1:IVR)
         IF( INDEX(ADUM(1:),'empirical').NE.0 )  THEN
           IEDL(NSL) = 2
           if(me.eq.0) WRITE( ISC,'(A)' ) 'Kemper and van Schaik Empirical Diffusion &
     Model'
+          if(me.eq.0) WRITE( IWR,'(A)' ) 'Kemper and van Schaik Empirical Diffusion &
+    Model'
           if(me.eq.0) WRITE( ISC,'(A)' ) '  Model Parameters Entered on the Solute/P &
+    orous Media Interaction Card'
+          if(me.eq.0) WRITE( IWR,'(A)' ) '  Model Parameters Entered on the Solute/P &
     orous Media Interaction Card'
         ELSEIF( INDEX(ADUM(1:),'conventional').NE.0 )  THEN
           IEDL(NSL) = 1
           if(me.eq.0) WRITE( ISC,'(A)' ) 'Conventional Diffusion Model'
+          if(me.eq.0) WRITE( IWR,'(A)' ) 'Conventional Diffusion Model'
           VARB = 'Aqueous Molecular Diffusion Coefficient @ 20 C'
           CALL RDDPR(ISTART,ICOMMA,CHDUM,SMDL(NSL))
           CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
           if(me.eq.0) WRITE(ISC,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
           ': ',SMDL(NSL)
-          INDX = 0
-          IUNM = 2
-          IUNS = -1
-          CALL RDUNIT(UNTS,SMDL(NSL),INDX)
-          if(me.eq.0) WRITE(ISC,'(A,1PE11.4,A)') ' (',SMDL(NSL),', m^2/s)'
-        ELSEIF( INDEX(ADUM(1:),'constant').NE.0 )  THEN
-          IEDL(NSL) = 3
-          if(me.eq.0) WRITE( ISC,'(A)' ) 'Constant Diffusion Model'
-          VARB = 'Aqueous Molecular Diffusion Coefficient'
-          CALL RDDPR(ISTART,ICOMMA,CHDUM,SMDL(NSL))
-          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-          if(me.eq.0) WRITE(ISC,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+          if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
           ': ',SMDL(NSL)
           INDX = 0
           IUNM = 2
           IUNS = -1
           CALL RDUNIT(UNTS,SMDL(NSL),INDX)
           if(me.eq.0) WRITE(ISC,'(A,1PE11.4,A)') ' (',SMDL(NSL),', m^2/s)'
+          if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',SMDL(NSL),', m^2/s)'
+        ELSEIF( INDEX(ADUM(1:),'constant').NE.0 )  THEN
+          IEDL(NSL) = 3
+          if(me.eq.0) WRITE( ISC,'(A)' ) 'Constant Diffusion Model'
+          if(me.eq.0) WRITE( IWR,'(A)' ) 'Constant Diffusion Model'
+          VARB = 'Aqueous Molecular Diffusion Coefficient'
+          CALL RDDPR(ISTART,ICOMMA,CHDUM,SMDL(NSL))
+          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+          if(me.eq.0) WRITE(ISC,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+          ': ',SMDL(NSL)
+          if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+          ': ',SMDL(NSL)
+          INDX = 0
+          IUNM = 2
+          IUNS = -1
+          CALL RDUNIT(UNTS,SMDL(NSL),INDX)
+          if(me.eq.0) WRITE(ISC,'(A,1PE11.4,A)') ' (',SMDL(NSL),', m^2/s)'
+          if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',SMDL(NSL),', m^2/s)'
         ELSE
           INDX = 4
           CHMSG = 'Unrecognized Aqueous Diffusion Option: '//ADUM
@@ -219,23 +234,30 @@
         IDFLT = 1
         CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
         if(me.eq.0) WRITE( ISC,'(/,A,$)' ) VARB(1:IVR)
+        if(me.eq.0) WRITE( IWR,'(/,A,$)' ) VARB(1:IVR)
         IF( INDEX(ADUM(1:),'noncontinuous').NE.0 )  THEN
           IF( INDEX(ADUM(1:),'concentration dependent').NE.0 ) THEN
             IPCL(NSL) = 4
             if(me.eq.0) WRITE( ISC,'(A)' ) 'Noncontinuous Solid Wetting / ' // &
             'Concentration Dependent'
+            if(me.eq.0) WRITE( IWR,'(A)' ) 'Noncontinuous Solid Wetting / ' // &
+            'Concentration Dependent'
           ELSE
             IPCL(NSL) = 2
             if(me.eq.0) WRITE( ISC,'(A)' ) 'Noncontinuous Solid Wetting'
+            if(me.eq.0) WRITE( IWR,'(A)' ) 'Noncontinuous Solid Wetting'
           ENDIF
         ELSE
           IF( INDEX(ADUM(1:),'concentration dependent').NE.0 ) THEN
             IPCL(NSL) = 3
             if(me.eq.0) WRITE( ISC,'(A)' ) 'Continuous Solid Wetting / Concentration &
     Dependent'
+            if(me.eq.0) WRITE( IWR,'(A)' ) 'Continuous Solid Wetting / Concentration &
+    Dependent'
           ELSE
             IPCL(NSL) = 1
             if(me.eq.0) WRITE( ISC,'(A)' ) 'Continuous Solid Wetting'
+            if(me.eq.0) WRITE( IWR,'(A)' ) 'Continuous Solid Wetting'
           ENDIF
         ENDIF
 
@@ -248,10 +270,13 @@
           CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
           if(me.eq.0) WRITE(ISC,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
           ': ',HLF(NSL)
+          if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+          ': ',HLF(NSL)
           INDX = 0
           IUNS = 1
           CALL RDUNIT(UNTS,HLF(NSL),INDX)
           if(me.eq.0) WRITE(ISC,'(A,1PE11.4,A)') ' (',HLF(NSL),', s)'
+          if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',HLF(NSL),', s)'
           HLF(NSL) = MAX( HLF(NSL),SMALL )
 !
 !---  Cut-off concentration for the Courant number limiter  ---
@@ -264,10 +289,13 @@
             CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
             if(me.eq.0) WRITE(ISC,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
             ': ',CCL_CRN(NSL)
+            if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+            ': ',CCL_CRN(NSL)
             INDX = 0
             IUNM = -3
             CALL RDUNIT(UNTS,CCL_CRN(NSL),INDX)
             if(me.eq.0) WRITE(ISC,'(A,1PE11.4,A)') ' (',CCL_CRN(NSL),', 1/m^3)'
+            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',CCL_CRN(NSL),', 1/m^3)'
           ENDIF
   200 CONTINUE
 !
@@ -295,6 +323,7 @@
       CALL RDINT(ISTART,ICOMMA,CHDUM,NLIN)
       IF( NLIN.GT.0 ) THEN
         if(me.eq.0) WRITE(ISC,'(/,A)') 'Chain Decay Fractions:'
+        if(me.eq.0) WRITE(IWR,'(/,A)') 'Chain Decay Fractions:'
       ENDIF
       DO 400 NL = 1, NLIN
         T_OK = BUFFEREDREAD_GETLINE(CHDUM)
@@ -328,6 +357,8 @@
         VARB = 'Chain Decay Fraction'
         CALL RDDPR(ISTART,ICOMMA,CHDUM,CHDF(NPSL,NDSL))
         if(me.eq.0) WRITE(ISC,'(2X,5A,1PE11.4)') 'From ', &
+        ADUM(1:NCHA),' to ',BDUM(1:NCHB),': ',CHDF(NPSL,NDSL)
+        if(me.eq.0) WRITE(IWR,'(2X,5A,1PE11.4)') 'From ', &
         ADUM(1:NCHA),' to ',BDUM(1:NCHB),': ',CHDF(NPSL,NDSL)
   400 CONTINUE
       DO 420 NDSL = 1,NSOLU

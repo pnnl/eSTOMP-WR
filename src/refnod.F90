@@ -408,6 +408,7 @@
       CHARACTER*64 SPACES
       CHARACTER*64 TXTX,STRX
       CHARACTER*4096 N_IWR,N_ISC
+      LOGICAL :: use_ga  
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -442,7 +443,7 @@
       DATA FORM18 /'(1X,A,A7,2A,$)'/
       DATA FORM19 /'(A,$)'/
       DATA FORM23 /'(10X,2A,$)'/
-      DATA SPACES /'                                                          '/
+      DATA SPACES /'                                                 '/
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -452,7 +453,7 @@
       ICSNX = INDEX( SUBNMX,'  ' )-1
       SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
       IF( INDEX(CVS_ID(169)(1:1),'$').EQ.0 ) CVS_ID(169) = &
-     '$Id: refnod.F,v 1.37 2008/02/13 01:05:53 d3c002 Exp $' 
+        '$Id: refnod.F,v 1.37 2008/02/13 01:05:53 d3c002 Exp $' 
       ICSN = ICSN+ICSNX
       EPSL = 1.D-14
 !     if(me.eq.0) then
@@ -1008,6 +1009,7 @@
             iunmol = sign(iunmol,iunmolx)
             IF( UNREF(IRNV) .NE. 'null' .and.me.eq.0) THEN
               INDX = 4
+!           write(*,*) 'UNREF(IRNV)',UNREF(IRNV),'Var',var
               CALL RDUNIT(UNREF(IRNV),VAR,INDX)
             ENDIF
             IF( MOD( (NSTEP-NRST),IFQO ).EQ.0 .and. me.eq.0.OR. &
@@ -1130,6 +1132,7 @@
 !
       REAL*8 VSKP(*)
       INTEGER JSKP(*)
+      LOGICAL :: use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -1582,6 +1585,7 @@
           IUNM = 1
           IUNS = -1
           VAR = vnc(3,n)
+!		  print *, "VNC(3,n) = ", vnc(3,n)
 !
 !---  Osmotic pressure  ---
 !
@@ -2407,7 +2411,7 @@
 !----------------------Parameter Statements----------------------------!
 !
 
-
+      LOGICAL :: use_ga
 
 !
 !----------------------Common Blocks-----------------------------------!

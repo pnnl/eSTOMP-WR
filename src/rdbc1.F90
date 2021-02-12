@@ -101,6 +101,7 @@
       USE GRID_MOD
       USE GRID
       USE BUFFEREDREAD
+      USE BCVP 
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -254,6 +255,7 @@ end interface
 
   ! Functions
   logical rd_sparse_ijkv
+  LOGICAL :: use_ga
 
 !
 !----------------------Common Blocks-----------------------------------!
@@ -420,6 +422,7 @@ end interface
       ISTART = 1
       VARB = 'Number of Boundary Condition Cards: '
       CALL RDINT(ISTART,ICOMMA,CHDUM,NLIN)
+!      write(*,*) 'me, nlin',me,nlin
       allocate(bc_(lbcv,lbtm,nlin))
       bc_ = 0.d0
 !        call add_bcnx_d2field('basex',nlin,idx)
@@ -1762,9 +1765,14 @@ time3x = 0.d0
      call delete_bcnx_field('bcnxi_id',t_ok)
      call delete_bcnx_field('bcnxj_id',t_ok)
      call delete_bcnx_field('bcnxk_id',t_ok)
-!
+!BH
+     call delete_bcnx_field('plb',t_ok)
+     call delete_bcnx_field('pgb',t_ok)
+     call delete_bcnx_field('q_flux_b',t_ok)
+!BH
+!     write(*,*) '0000, num_bcnx',num_bcnx
      num_bcnx = newnumx
-!
+!    write(*,*) '1111, num_bcnx',num_bcnx
 !---  reallocate variables for boundary conditions
 !
     if(num_bcnx.ne.0) then
@@ -1784,6 +1792,21 @@ time3x = 0.d0
      call add_bcnx_ifield('ibcn',idx)
      i_bcnx_fld(idx)%p => b_id_%p
      ibcn => i_bcnx_fld(idx)%p
+!BH
+     idim1 = LUK+LPH*LSOLU*LC+LR+LL+LG+LN
+     call add_bcnx_d2field('plb',idim1,idx)
+      plb => d_bcnx_2fld(idx)%p
+      plb = 0.d0
+     call add_bcnx_d2field('pgb',idim1,idx)
+      pgb => d_bcnx_2fld(idx)%p
+      pgb = 0.d0
+     call add_bcnx_d2field('q_flux_b',idim1,idx)
+      q_flux_b => d_bcnx_2fld(idx)%p
+      q_flux_b = 0.d0
+ 
+   
+!BH
+
 
 !x     call add_bcnx_d3field('bc',lbcv,lbtm,idx)
 !x     bc => d_bcnx_3fld(idx)%p
@@ -1839,6 +1862,7 @@ time3x = 0.d0
         call ga_igop(5,basen(nb),1,'max')
         if(basen(nb).gt.0) rbase = rbase+1
       enddo
+!      write(*,*) 'me,rbase',me,rbase
 !      endif
 !      call ga_igop(5,rbase,1,'+')
       allocate(base_node(rbase))
@@ -1875,6 +1899,7 @@ time3x = 0.d0
               basez(n_bx) = zp(nx) + b_dist_%p(icx)
 !            print *,'goto rdbc base-',icx,nx,basex(n_bx),basey(n_bx),basez(n_bx)
             endif
+!            write(*,*) 'me,icx,basez',me, icx,basez(n_bx)
           endif       
 !          base_node(irfbx) = ibcn(icx)
         else

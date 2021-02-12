@@ -105,6 +105,7 @@ SUBROUTINE WRRST
    CHARACTER*64 name
    CHARACTER*64 GETSPNM
    EXTERNAL GETSPNM
+   LOGICAL :: use_ga
    !      character*64 t_string
    !
    !----------------------Data Statements---------------------------------!

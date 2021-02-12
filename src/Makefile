@@ -35,8 +35,9 @@ else
 endif
 
 ifeq ($(findstring constance,$(SYSTEM)),constance)
-   PETSC_ARCH  = arch-linux2-c-opt
-   PETSC_DIR   = /pic/projects/geophys/stomp-e4d/petsc-3.3-p7
+   PETSC_ARCH  = intel
+   PETSC_DIR   = /people/d3a926/lib/petsc-3.1-p8
+#   PETSC_DIR   = /pic/projects/geophys/stomp-e4d/petsc-3.3-p7
    GA_DIR      = /people/d3a926/lib/exahdf/intel
    MPI_DIR     = /share/apps/openmpi/1.8.3/intel/15.0.1
 
@@ -44,14 +45,17 @@ ifeq ($(findstring constance,$(SYSTEM)),constance)
    HDF5_DIR    = /people/d3a926/lib/exahdf/intel
    H5HUT_DIR   = /people/d3a926/lib/exahdf/intel
 
+#   HDF5_DIR    = /people/d3a926/lib/exahdf/gcc
+#   H5HUT_DIR   = /people/d3a926/lib/exahdf/gcc
    FC = mpif90
 #  DEBUG_FLAG = -g 
-#  DEBUG_FLAG = -g -traceback -fpe:0 -check all 
+#  DEBUG_FLAG = -u -g -traceback -fpe:0 -check all 
 #  OPTIMIZE_FLAG = #-fast -O2
-#   OPTIMIZE_FLAG = -O2 -fp-model precise
-   OPTIMIZE_FLAG = -O2
+   OPTIMIZE_FLAG = -O2 -fp-model precise
 #   OPTIMIZE_FLAG = -O2
-#   FCFLAGS =  $(DEBUG_FLAG) $(OPTIMIZE_FLAG) #-fPIC 
+#   OPTIMIZE_FLAG = -O2
+   FCFLAGS =  $(DEBUG_FLAG) $(OPTIMIZE_FLAG) -fPIC 
+#   FLINKER = mpif90 -fPIC -CB -g 
    FLINKER = mpif90 
    CPP = cpp
    CPPFLAGS = -P -traditional-cpp
@@ -158,12 +162,12 @@ SOURCEF = grid_mod.F90\
           banner.F90\
           petscapp.F90\
           bcf1.F90\
+          difmn.F90\
           bcj1.F90\
           bcp1.F90\
           cap1.F90\
           chk1.F90\
           cisc1.F90\
-          difmn.F90\
           dpor1.F90\
           drcvl.F90\
           drcvlb.F90\
@@ -203,7 +207,8 @@ SOURCEF = grid_mod.F90\
           rdinac.F90\
           rdini.F90\
           rdinpl.F90\
-          rdinpt1.F90\
+          ucode1.F90\
+	  rdinpt1.F90\
           rdint.F90\
           rdlrp.F90\
           rdmech.F90\
@@ -268,12 +273,12 @@ FOBJS =   \
           petscapp.o\
           banner.o\
           bcf1.o\
+          difmn.o\
           bcj1.o\
           bcp1.o\
           cap1.o\
           chk1.o\
           cisc1.o\
-          difmn.o\
           dpor1.o\
           drcvl.o\
           drcvlb.o\
@@ -307,6 +312,7 @@ FOBJS =   \
           rdinac.o\
           rdini.o\
           rdinpl.o\
+          ucode1.o\
           rdinpt1.o\
           rdint.o\
           rdlrp.o\
@@ -390,7 +396,7 @@ $(OBJS): %.o: %.F90
 #	$(FC) -c $(DEFINES) $(FCFLAGS) $(INCLUDES) $< -o $*.o
 
 eSTOMP1: $(OBJS)
-	$(FC) -o eSTOMP1.x $(OBJS) $(LIBS)
+	$(FC) -o stomp1.x $(OBJS) $(LIBS)
 
 
 #------------------------------------------------------------------

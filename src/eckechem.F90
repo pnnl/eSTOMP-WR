@@ -1085,6 +1085,8 @@
       REAL*8 DCLX(LSPL),CLX(LSPL),ACTVX(LSPL+1,LSPL)
       REAL*8 VFX(LSPS+1)
       INTEGER IJM(LSPR)
+      LOGICAL :: USE_GA
+
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -3618,6 +3620,7 @@
 !
       CHARACTER*64 GETSPNM
       EXTERNAL GETSPNM
+      LOGICAL :: USE_GA
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -3741,6 +3744,8 @@
 !---      Normal simulation  ---
 !
           ELSE
+!fixed pH
+            if(mod(isplk(1),100) == nsp) cycle
 !
 !---        Convert reactive species from node volumetric, kmol/m^3
 !           to node volumetric, mol/m^3  ---
@@ -9057,6 +9062,7 @@
       INTEGER ISPX(LSPR)
       CHARACTER*64 GETSPNM
       EXTERNAL GETSPNM
+      LOGICAL :: USE_GA
 !
 !----------------------Executable Lines--------------------------------!
 !

@@ -80,6 +80,7 @@
 !
      real*8 :: rsdw(isvc)
      integer :: nsdw(isvc)
+     LOGICAL :: use_ga
 !
 !----------------------Executable Lines--------------------------------!
 !
