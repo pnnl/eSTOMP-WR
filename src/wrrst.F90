@@ -60,6 +60,7 @@ SUBROUTINE WRRST
    USE FDVH
    use grid_mod
    use sio
+   USE COUP_WELL
    !
 
    !----------------------Implicit Double Precision-----------------------!
@@ -350,6 +351,30 @@ SUBROUTINE WRRST
 
       ENDIF
    ENDIF
+!***************Coupled well - Bryan****************
+!
+!---  Coupled-well data  ---
+!
+#ifdef USE_H5HUT
+   if(n_cw > 0) then
+     istat = ior(sio_write_scalar_int("N_CW",N_CW),istat)
+        DO NCW = 1,N_CW
+!          WRITE(IRS,'(1PE22.15)') P_CW_G(NCW)
+          write(varname,"(A6,I1)") "P_CW_G",NCW
+          istat =  ior(sio_write_scalar_dbl(varname,P_CW_G(NCW)),istat)
+        END DO
+   endif
+#else
+      IF( N_CW.GT.0 .and.me.eq.0) THEN
+        WRITE(IRS,'(A)') 'Coupled-Well Model Data'
+        WRITE(FORM1(3:3),'(I1)') ICOUNT(N_CW)
+        WRITE(IRS,FORM1) N_CW
+        DO 730 NCW = 1,N_CW
+          WRITE(IRS,'(1PE22.15)') P_CW_G(NCW)
+  730   CONTINUE
+      ENDIF
+#endif
+!****************************************************
    !
    !---  Close the restart file  ---
    !

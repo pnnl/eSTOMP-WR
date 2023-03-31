@@ -186,6 +186,7 @@
       USE FDVH
       USE CONST
       USE BUFFEREDREAD
+      USE PLT_ATM
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -1185,6 +1186,8 @@
             ICRNT = 1
           ENDIF
         ENDIF
+        IPLANT = 0
+        IF( INDEX(ADUM(1:),'plant').NE.0 ) IPLANT = 1
 !
 !---    Advection-diffusion transport scheme  ---
 !

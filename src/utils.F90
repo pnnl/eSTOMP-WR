@@ -101,7 +101,7 @@
       IUNIT = 36
       OPEN( UNIT=IUNIT,FILE=FDUM(1:NCHF),STATUS='OLD',FORM=CDUM )
       T_OK = .TRUE.
-      WRITE(ISC,'(/,2A)') TRIM(CARD), ' File: ',FDUM(1:NCHF)
+      IF(ME.EQ.0) WRITE(ISC,'(3A,/)') TRIM(CARD), ' File: ',FDUM(1:NCHF)
 !
 !---  End of file open 
 !

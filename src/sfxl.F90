@@ -68,6 +68,8 @@
       double precision, dimension(3) :: s_area_x 
       logical :: isjcb
       LOGICAL :: use_ga
+      real*8::idr(3),max_idr
+      integer:: id_max
 !
 !----------------------Include Statements------------------------------!
 !
@@ -118,16 +120,33 @@
         C(NSL,ID_DN)*FCL_DN*ALP - C(NSL,ID_UP)*AL*FCL_UP
     ENDIF
 !--- prepare for surface flux output
-    idr_x = unvxc(iconn)
-    idr_y = unvyc(iconn)
-    idr_z = unvzc(iconn)
-    if(idr_x /= 0) then
-      c_flux_nd(1,nsl,id_up) = c_flux(nsl,iconn)
-    elseif(idr_y /= 0) then
-      c_flux_nd(2,nsl,id_up) = c_flux(nsl,iconn)
-    elseif(idr_z /= 0) then
-      c_flux_nd(3,nsl,id_up) = c_flux(nsl,iconn)
-    endif
+!    idr_x = unvxc(iconn)
+!    idr_y = unvyc(iconn)
+!    idr_z = unvzc(iconn)
+    idr(1) = unvxc(iconn)
+    idr(2) = unvyc(iconn)
+    idr(3) = unvzc(iconn)
+!    write(*,*) 'unvxc,unvyc,unvzc:',idr(:)
+    if (ics/=3 .AND. ics/=8 ) then
+     if(idr(1) /= 0) then
+       c_flux_nd(1,nsl,id_up) = c_flux(nsl,iconn)
+     elseif(idr(2) /= 0) then
+       c_flux_nd(2,nsl,id_up) = c_flux(nsl,iconn)
+     elseif(idr(3) /= 0) then
+       c_flux_nd(3,nsl,id_up) = c_flux(nsl,iconn)
+     endif
+    else
+      max_idr = 0.0
+      id_max = 0
+      do i_dir = 1, 3
+         if (abs(idr(i_dir))>=max_idr) then
+            max_idr = abs(idr(i_dir))
+            id_max = i_dir
+         endif
+      enddo
+      c_flux_nd(id_max,nsl,id_up) = c_flux(nsl,iconn)
+    endif 
+!    write(*,*) 'iconn,id_max,c_flux_nd:',iconn,id_max,c_flux_nd(id_max,nsl,id_up)
   ENDDO
 !
 !---  End of SFXL group  ---

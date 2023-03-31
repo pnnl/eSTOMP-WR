@@ -321,6 +321,7 @@
 !   286 source-well temperature C, 'SWT'
 !   287 aqueous spill head/height m, 'HLSP'
 !   288 NAPL spill head/height m, 'HNSP'
+!   289 Evapotranspiration 'ET'
 !   401	solute volumetric concentration 'C   '
 !   402	solute aqueous concentration 'CL  '
 !   403	solute gas concentration 'CG  '
@@ -354,6 +355,8 @@
       USE FILES
       use fdvp
       use grid_mod
+      USE COUP_WELL
+      use plt_atm
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -577,6 +580,7 @@
         ENDIF
         DO 20 NV = 1,NVREF
           IRNV = IREF(NV)
+          IRNV_CW = IREF_CW(NV) ! Added for coupled well - Bryan
           IRNVGC = IREFGC(NV)
           ISX = ISGNO+7
           ITX = 4
@@ -752,6 +756,7 @@
         ENDIF
         DO 50 NV = 1,NVREF
           IRNV = IREF(NV)
+          IRNV_CW = IREF_CW(NV) ! Coupled well - Bryan
           IRNVGC = IREFGC(NV)
           ISX = ISGNS+7
           ITX = 4
@@ -958,6 +963,7 @@
             ENDIF
 !           IRNVX = MOD((IRNV-INDX),33)
             IRNVGC = IREFGC(NV)
+            IRNV_CW = IREF_CW(NV) ! Coupled well - Bryan
             var = 0.d0
             iunm = 0
             iunkg = 0
@@ -971,7 +977,8 @@
             iunmolx = 0
             IF(NX.NE.0.OR.IRNVX.EQ.23.OR.IRNV.EQ.191 &
                .OR.IRNVX.EQ.6) &
-              CALL REFVAR( VAR,VSKP,IRNV,IRNVGC,JSKP,N )
+               CALL REFVAR( VAR,VSKP,IRNV,IRNVGC,IRNV_CW,JSKP,N )
+!              CALL REFVAR( VAR,VSKP,IRNV,IRNVGC,JSKP,N )
             varx = var
             var = abs(var)
             call ga_dgop(1,varx,1,'+')
@@ -1050,7 +1057,8 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE REFVAR( VAR,VSKP,IRNV,IRNVGC,JSKP,N )
+       SUBROUTINE REFVAR( VAR,VSKP,IRNV,IRNVGC,IRNV_CW,JSKP,N )
+!      SUBROUTINE REFVAR( VAR,VSKP,IRNV,IRNVGC,JSKP,N )
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -1109,6 +1117,8 @@
       USE CONST
       use fluxp
       use grid_mod
+      USE COUP_WELL
+      use plt_atm
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -1148,8 +1158,8 @@
       ICSNX = INDEX( SUBNMX,'  ' )-1
       SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
       IF( INDEX(CVS_ID(169)(1:1),'$').EQ.0 ) CVS_ID(169) = &
-     '$Id: refnod.F,v 1.37 2008/02/13 01:05:53 d3c002 Exp $' 
-      ICSN = ICSN+ICSNX
+      '$Id: refnod.F,v 1.37 2008/02/13 01:05:53 d3c002 Exp $' 
+        ICSN = ICSN+ICSNX
 !
 !---  Assign surface indices ---
 !
@@ -1267,7 +1277,7 @@
 !---  Gravimetric moisture content  ---
 !
        ELSEIF( IRNV.EQ.16 ) THEN
-         VAR = (SL(2,N)*PORD(2,N))/((RHOS(IZ(N))*(1-PORD(2,N)))/RHOL(2,N))
+         VAR = (SL(2,N)*PORD(2,N))/((RHOS(N)*(1-PORD(2,N)))/RHOL(2,N))
 !
 !---  Total-liquid moisture content  ---
 !
@@ -1619,6 +1629,17 @@
           IUNS = -1
           VAR = SRCW(2,N)
 !
+!---    Coupled-well pressure    ---   ! coupled well - Bryan
+!
+        IF( L_CW.EQ.1 ) THEN
+
+         VAR = P_CW_G(IRNV_CW) + PATM
+        endif
+       ELSEIF( IRNV.EQ.140 ) THEN
+        IUNKG = 1
+        IUNS = -1
+        VAR = SRCW(2,N)
+!
 !---  Aqueous well depth  ---
 !
         ELSEIF( IRNV.EQ.144 ) THEN
@@ -1862,7 +1883,30 @@
         ELSE
           VAR = VSKP(282)
         ENDIF
+!
+!---  Evapotranspiration  ---
+!
+      ELSEIF( IRNV.EQ.289 ) THEN
+        IUNM = 1
+        IUNS = -1
+        VAR = ET(2,N)      
       ENDIF
+    
+!
+!---  Coupled-well mass rate   ---
+!
+      IF( IRNV.EQ.349 ) THEN
+        IUNKG = 1
+        IUNS = -1
+        VAR = G_QM_CW(1,IRNV_CW)
+!
+!---  Coupled-well mass integral  ---
+!
+      ELSEIF( IRNV.EQ.350 ) THEN
+        IUNKG = 1
+        VAR = G_QM_CW(2,IRNV_CW)
+      ENDIF
+
 !
 !---  Solute, conservation-component species, and
 !     kinetic-component species reference-node output ---

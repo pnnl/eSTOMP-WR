@@ -55,6 +55,7 @@
       USE FDVP
       USE BCVP
       USE CONST
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!

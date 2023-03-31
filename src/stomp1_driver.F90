@@ -167,7 +167,6 @@ program stomp_driver
 
   !-- Read input file to buffer and determine memory requirements ---
   call step
-
   ! -- Process grid card and set up distributed arrays
   if( bufferedread_find( '~GRID' ) )then
      call rdgrid

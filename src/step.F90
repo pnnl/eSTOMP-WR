@@ -53,6 +53,7 @@
       USE BCV
       USE GLB_PAR
       USE BUFFEREDREAD
+      USE COUP_WELL
 !
 !----------------------Implicit Double Precision-----------------------!
 !
@@ -238,6 +239,25 @@
         IF( ME.EQ.0 ) CALL WRMSGS( INDX )
         CALL RD_CNEQ
       ENDIF
+!
+!---  Search input file for coupled well card --
+!
+      IF( BUFFEREDREAD_FIND( '~coupled well' ) )THEN
+        INDX = 1
+        CHMSG = 'Reading Coupled Well Card in STEP'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+        CALL RD_COUP_WELL
+      ENDIF
+!
+!---  Search input file for plant property card --
+!
+      IF( BUFFEREDREAD_FIND( '~plant properties' ) )THEN
+        INDX = 1
+        CHMSG = 'Reading Plant Properties Card in STEP'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+        CALL RD_PLANT
+      ENDIF
+
 !
 !---  Compute parameters ---
 !
@@ -1179,6 +1199,7 @@
       USE BCV
       USE GLB_PAR
       USE BUFFEREDREAD
+      USE PLT_ATM
 !
 !----------------------Implicit Double Precision-----------------------!
 !
@@ -1201,6 +1222,125 @@
 !---  Assign card string  ---
 !
       CARD = 'Boundary Conditions Card'
+!      LPFT = 0
+!      NPFTX = 0
+!      IF( lplant > 0 ) THEN
+!          T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!          CALL LCASE( CHDUM )
+!          ISTART = 1
+!          CALL RD_INT(ISTART,ICOMMA,CHDUM,NPFTX)
+!          LPFT = MAX( LPFT,NPFTX )
+!!          LPLANT = LPFT ! BH
+!
+!---        Loop over pft inputs  ---
+!
+!            DO NSPX = 1,LPFT
+!
+!---          Initial input line  ---
+!
+!              !IF( NSPX.EQ.1 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              !ENDIF
+!
+!---          Allow for returns in input lines  ---
+!
+!              CALL CHKCHR( ISTART,ICOMMA,CHDUM,INDX )
+!              IF( INDX.EQ.0 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              ENDIF
+!              VARB = 'Paramter Roota , '
+!              CALL RDDPR(ISTART,ICOMMA,CHDUM,ROOTAX)
+!            enddo
+!            DO NSPX = 1,LPFT
+!
+!---          Initial input line  ---
+!
+!              !IF( NSPX.EQ.1 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              !ENDIF
+!
+!---          Allow for returns in input lines  ---
+!
+!              CALL CHKCHR( ISTART,ICOMMA,CHDUM,INDX )
+!              IF( INDX.EQ.0 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              ENDIF
+!              VARB = 'Paramter Rootb , '
+!              CALL RDDPR(ISTART,ICOMMA,CHDUM,ROOTBX)
+!            enddo
+!            DO NSPX = 1,LPFT
+!
+!---          Initial input line  ---
+!
+!              !IF( NSPX.EQ.1 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              !ENDIF
+!
+!---          Allow for returns in input lines  ---
+!
+!              CALL CHKCHR( ISTART,ICOMMA,CHDUM,INDX )
+!              IF( INDX.EQ.0 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              ENDIF
+!              VARB = 'Stomata fully open potential , '
+!              CALL RDDPR(ISTART,ICOMMA,CHDUM,ROOTAX)
+!            enddo
+!            DO NSPX = 1,LPFT
+!
+!---          Initial input line  ---
+!
+!              !IF( NSPX.EQ.1 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              !ENDIF
+!
+!---          Allow for returns in input lines  ---
+!
+!              CALL CHKCHR( ISTART,ICOMMA,CHDUM,INDX )
+!              IF( INDX.EQ.0 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              ENDIF
+!              VARB = 'Stomata fully closed potential, '
+!              CALL RDDPR(ISTART,ICOMMA,CHDUM,ROOTBX)
+!            enddo
+!            DO NSPX = 1,LPFT
+!
+!---          Initial input line  ---
+!
+!              !IF( NSPX.EQ.1 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              !ENDIF
+!
+!---          Allow for returns in input lines  ---
+!
+!              CALL CHKCHR( ISTART,ICOMMA,CHDUM,INDX )
+!              IF( INDX.EQ.0 ) THEN
+!                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!                CALL LCASE( CHDUM )
+!                ISTART = 1
+!              ENDIF
+!              VARB = 'Maximum root depth , '
+!              CALL RDDPR(ISTART,ICOMMA,CHDUM,ROOTAX)
+!            enddo
+!      endif
+
 !
 !---  Read number of boundary condition inputs  ---
 !
@@ -1264,6 +1404,14 @@
           ENDIF
           CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
    60   CONTINUE
+!        if( (INDEX(CHDUM(1:),'evap').NE.0 .or. &
+!            INDEX(CHDUM(1:),'pet').NE.0) .and. lplant == 1) then
+!             T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!             CALL LCASE( CHDUM )
+!             ISTART = 1
+!             VARB = 'PFT number'
+!             CALL RDINT(ISTART,ICOMMA,CHDUM,IPFTX)
+!        endif
 !
 !---    Read number of reactive species in boundary
 !       condition  ---
@@ -2768,6 +2916,9 @@
               IRCKTX = 11
             ELSEIF( INDEX(ADUM(1:),'toward reactants').NE.0 ) THEN
               IRCKTX = 12
+              IF( INDEX(ADUM(1:),'iex ph and time dependency').NE.0 ) THEN
+                IRCKTX = 120
+              ENDIF
             ENDIF
           ENDIF
         ELSEIF( INDEX(ADUM(1:),'multi').NE.0 .AND. &
@@ -2810,7 +2961,7 @@
 !
         IF( (IRCKTX.GE.10 .AND. IRCKTX.LE.12) .OR. &
         (IRCKTX.GE.5 .AND. IRCKTX.LE.7) .OR. &
-        IRCKTX.EQ.20 ) THEN
+        IRCKTX.EQ.20 .OR. IRCKTX.EQ.120 ) THEN
 !
 !---      Allow for returns in input lines  ---
 !
@@ -2916,7 +3067,7 @@
 !---    TST type reactions  ---
 !
         IF( (IRCKTX.GE.10 .AND. IRCKTX.LE.12) .OR. &
-        (IRCKTX.GE.5 .AND. IRCKTX.LE.7) ) THEN
+        (IRCKTX.GE.5 .AND. IRCKTX.LE.7) .OR. IRCKTX.EQ.120) THEN
 !
 !---      Read forward dissolution-precipitation
 !         reference reaction rate  ---
@@ -2962,6 +3113,29 @@
           IF( IRCKTX.GE.5 .AND. IRCKTX.LE.9 ) THEN
             JCX = JCX+1
             VARB = 'Kinetic Reaction pH Exponent'
+            IF( INDEX(CHDUM(ISTART:ISTART+5),'file') /= 0 ) THEN
+              T_OK = FILEEXISTS( CHDUM,ISTART,ICOMMA )
+              FILEREAD = .TRUE.
+            ELSE
+             CALL RD_DPR(ISTART,ICOMMA,CHDUM,VAR)
+            ENDIF
+          ENDIF
+!
+!---      Read iex ph and time dependency
+!
+          IF( IRCKTX.EQ.120 ) THEN
+!         pH exponent  ---
+            JCX = JCX+1
+            VARB = 'Kinetic Reaction pH Exponent'
+            IF( INDEX(CHDUM(ISTART:ISTART+5),'file') /= 0 ) THEN
+              T_OK = FILEEXISTS( CHDUM,ISTART,ICOMMA )
+              FILEREAD = .TRUE.
+            ELSE
+             CALL RD_DPR(ISTART,ICOMMA,CHDUM,VAR)
+            ENDIF
+!         Simulatoin time exponent  ---
+            JCX = JCX+1
+            VARB = 'Kinetic Reaction Simulation Time Exponent'
             IF( INDEX(CHDUM(ISTART:ISTART+5),'file') /= 0 ) THEN
               T_OK = FILEEXISTS( CHDUM,ISTART,ICOMMA )
               FILEREAD = .TRUE.
@@ -4173,6 +4347,7 @@
       IF( INDEX(ADUM(1:),'eckechem').NE.0 )  LR = 1
       IF( INDEX(ADUM(1:),'5512').NE.0 ) LC = 1
       IF( INDEX(ADUM(1:),'ice').NE.0 ) LFW = 1
+      IF( INDEX(ADUM(1:),'plant').NE.0 ) LPLANT = 1
 !
 !---  Water (H2O) Operational Mode  ---
 !
@@ -4441,9 +4616,10 @@
 !----------------------Type Declarations-------------------------------!
 !
       CHARACTER*512 CHDUM,CHDUMX
-      CHARACTER*128 ADUM,BDUM,FDUM,FMDUM
+      CHARACTER*128 ADUM,BDUM,FDUM,FMDUM,CDUM,TMP
       LOGICAL FCHK
       LOGICAL T_OK
+      integer, dimension(:,:), allocatable :: temp_ijk
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -4451,6 +4627,7 @@
       ICSNX = INDEX( SUBNMX,'  ' )-1
       SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
       ICSN = ICSN+ICSNX
+      me = ga_nodeid()
 !
 !---  Assign card string  ---
 !
@@ -4549,45 +4726,76 @@
             IF( INDX == 1 ) EXIT
             VARB = 'Source Type Option'
             CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+            IF( INDEX(BDUM,'file').EQ.1 ) EXIT
           END DO
 !
 !---      Read source domain indices  ---
 !
-          VARB = 'Source Domain Index: '
-          ISX = ISTART
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,IS)
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,IE)
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,JS)
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,JE)
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,KS)
-          CALL RD_INT(ISTART,ICOMMA,CHDUM,KE)
-          ICX = ISTART
+          IF( INDEX(BDUM,'file').EQ.0 ) THEN
+            VARB = 'Source Domain Index: '
+            ISX = ISTART
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,IS)
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,IE)
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,JS)
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,JE)
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,KS)
+            CALL RD_INT(ISTART,ICOMMA,CHDUM,KE)
+            ICX = ISTART
 !
 !---      Check for ill-defined source domains  ---
 !
-          IF( IS.LT.1 .OR. IE.LT.1 .OR.IE.LT.IS ) THEN
-            INDX = 4
-            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-            CALL WRMSGS( INDX )
-          ENDIF
-          IF( JS.LT.1 .OR. JE.LT.1 .OR. JE.LT.JS ) THEN
-            INDX = 4
-            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-            CALL WRMSGS( INDX )
-          ENDIF
-          IF( KS.LT.1 .OR. KE.LT.1 .OR. KE.LT.KS ) THEN
-            INDX = 4
-            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-            CALL WRMSGS( INDX )
-          ENDIF
+            IF( IS.LT.1 .OR. IE.LT.1 .OR.IE.LT.IS ) THEN
+              INDX = 4
+              CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+              CALL WRMSGS( INDX )
+            ENDIF
+            IF( JS.LT.1 .OR. JE.LT.1 .OR. JE.LT.JS ) THEN
+              INDX = 4
+              CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+              CALL WRMSGS( INDX )
+            ENDIF
+            IF( KS.LT.1 .OR. KE.LT.1 .OR. KE.LT.KS ) THEN
+              INDX = 4
+              CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+              CALL WRMSGS( INDX )
+            ENDIF
 !
 !---      Define a unique source input for each node 
 !         in the domain for the solute inventory source  ---
 !
-          IF( ISRTX.EQ.-(3*LSOLU) ) THEN
-            NSRX = NSRX+(IE-IS+1)*(JE-JS+1)*(KE-KS+1)
+            IF( ISRTX.EQ.-(3*LSOLU) ) THEN
+              NSRX = NSRX+(IE-IS+1)*(JE-JS+1)*(KE-KS+1)
+            ELSE
+              NSRX = NSRX+1
+            ENDIF
           ELSE
-            NSRX = NSRX+1
+          ! read external file to define source domain
+            CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+            NCH = INDEX(FDUM,'  ')-1
+            IF (ME==0) THEN
+              T_OK = OPENFILE( FDUM(1:NCH),IUNIT,0 )
+            ENDIF
+            NTOTAL = 1E8  ! assume a large number 
+            ALLOCATE(TEMP_IJK(NTOTAL,3))
+            TEMP_IJK = 0
+            IS = 1
+            IE = 1
+            JS = 1
+            JE = 1
+            KS = 1
+            KE = 0
+            T_OK = RD_SPARSE_IJK(FDUM(1:NCH),TEMP_IJK(1,1),NTOTAL,3,KE)
+            call ga_igop(29,ke,1,'max')
+            DEALLOCATE(TEMP_IJK)
+!
+!---      Define a unique source input for each node
+!         in the domain for the solute inventory source  ---
+!
+            IF( ISRTX.EQ.-(3*LSOLU) ) THEN
+              NSRX = NSRX+KE+1
+            ELSE
+              NSRX = NSRX+1
+            ENDIF
           ENDIF
         ENDIF
 !
@@ -4619,7 +4827,16 @@
 !
         DO 100 NTM = 1,NSTM
           T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+          CALL LCASE( CHDUM )
+          ISTART = 1
+!
+!---      Check for external boundary condition time file  ---
+!
+          IF( NTM.EQ.1 ) CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,CDUM)
+          CALL LCASE( CDUM )
+          IF( INDEX(CDUM(1:),'file').NE.0 ) GOTO 110
   100   CONTINUE
+  110 CONTINUE
   200 CONTINUE
       LSR = MAX( LSR,NSRX )
 !
@@ -4780,4 +4997,419 @@
 !
       RETURN
       END
+	
+!----------------------Subroutine--------------------------------------!
+!
+      SUBROUTINE RD_COUP_WELL
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------Copyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Read Coupled Well Card for parameters.
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by MD White, PNNL, 25 March 2011.
+!     $Id: step.F,v 1.2 2011/09/09 17:15:37 d3c002 Exp $
+!
+!----------------------Fortran 90 Modules------------------------------!
+!
+        USE SOLTN
+        USE JACOB
+        USE GRID
+        USE FILES
+        USE COUP_WELL
+        USE CONST
+        USE GLB_PAR
+        USE BUFFEREDREAD
+!
+!----------------------Implicit Double Precision-----------------------!
+!
+        IMPLICIT REAL*8 (A-H,O-Z)
+        IMPLICIT INTEGER (I-N)
+!
+!----------------------Type Declarations-------------------------------!
+!
+        CHARACTER*512 CHDUM
+        CHARACTER*128 ADUM,BDUM
+        CHARACTER*64 UNTS
+!
+!----------------------Executable Lines--------------------------------!
+!
+!        ISUB_LOG = ISUB_LOG+1
+!        SUB_LOG(ISUB_LOG) = '/RD_COUP_WELL'
+         me = ga_nodeid()
+!
+!---  Assign card string  ---
+!
+        CARD = 'Coupled Well Card'
+!
+!---  Read number of wells  ---
+!
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!        CALL RD_INPL( CHDUM )
+        CALL LCASE( CHDUM )
+        ISTART = 1
+        VARB = 'Number of Coupled Wells'
+        CALL RD_INT(ISTART,ICOMMA,CHDUM,N_CW)
+        LN_CW = MAX( LN_CW,N_CW )
+        L_CW = 1
+        NIT_CW = 0
+        LWI_CW = 0
+!       if(me.eq.0)WRITE(*,*) '# of well is: ',N_CW
+        DO 500 NCW = 1,N_CW
+!
+!---    Read well type  ---
+!
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!        CALL RD_INPL( CHDUM )
+        CALL LCASE( CHDUM )
+        ISTART = 1
+        VARB = 'Coupled Well Type'
+        CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
+!        IF( INDEX(ADUM(1:),'co2').NE.0 .AND. &
+!      INDEX(ADUM(1:),'injection').NE.0 ) THEN
+!      VARB = 'Water-Vapor Option'
+!      CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+!      IF( INDEX(BDUM(1:),'rel').NE.0 ) THEN
+!        IT_CWX = 3
+!      ELSEIF( INDEX(BDUM(1:),'mass').NE.0 .AND. &
+!        INDEX(BDUM(1:),'frac').NE.0 ) THEN
+!        IT_CWX = 2
+!      ELSE
+!        IT_CWX = 1
+!      ENDIF
+      IF( INDEX(ADUM(1:),'aqueous').NE.0 .AND. &
+        INDEX(ADUM(1:),'injection').NE.0 ) THEN
+!        if(me.eq.0)WRITE(IWR,'(2X,A)') 'Coupled Aqueous Injection Well'
+!        VARB = 'Dissolved CO2 Option'
+!        CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+!        IF( INDEX(BDUM(1:),'rel').NE.0 ) THEN
+!                IT_CWX = 6
+!        ELSEIF( INDEX(BDUM(1:),'mass').NE.0 .AND. &
+!                INDEX(BDUM(1:),'frac').NE.0 ) THEN
+!                IT_CWX = 5
+!        ELSE
+!                if(me.eq.0)WRITE(IWR,'(2X,A)') 'No Dissolved CO2'
+                IT_CWX = 4
+!        ENDIF
+        VARB = 'Dissolved Salt Option'
+        CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+        IF( INDEX(BDUM(1:),'rel').NE.0 ) THEN
+                IT_CWX = IT_CWX + 10
+        ELSEIF( INDEX(BDUM(1:),'mass').NE.0 .AND. &
+                INDEX(BDUM(1:),'frac').NE.0 ) THEN
+                IT_CWX = IT_CWX + 20
+        ELSE
+!                if(me.eq.0)WRITE(IWR,'(2X,A)') 'No Dissolved Salt'
+                IT_CWX = IT_CWX + 30
+        ENDIF
+      ELSEIF( (INDEX(ADUM(1:),'withdrawl').NE.0 .OR. &
+        INDEX(ADUM(1:),'production').NE.0) .AND. &
+        INDEX(ADUM(1:),'volumetric').NE.0  ) THEN
+        IT_CWX = -1
+!        VARB = 'Dissolved Salt Option'
+!        CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+!        IF( INDEX(BDUM(1:),'rel').NE.0 ) THEN
+!                IT_CWX = IT_CWX - 10
+!        ELSEIF( INDEX(BDUM(1:),'mass').NE.0 .AND. &
+!                INDEX(BDUM(1:),'frac').NE.0 ) THEN
+!                IT_CWX = IT_CWX - 20
+!        ELSE
+!                if(me.eq.0)WRITE(IWR,'(2X,A)') 'No Dissolved Salt'
+!                IT_CWX = IT_CWX - 30
+!        ENDIF
+      ELSEIF( (INDEX(ADUM(1:),'withdrawl').NE.0 .OR. &
+        INDEX(ADUM(1:),'production').NE.0) .AND. &
+        INDEX(ADUM(1:),'mass').NE.0  ) THEN
+        IT_CWX = -2
+!        VARB = 'Dissolved Salt Option'
+!        CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)
+!        IF( INDEX(BDUM(1:),'rel').NE.0 ) THEN
+!                IT_CWX = IT_CWX - 10
+!        ELSEIF( INDEX(BDUM(1:),'mass').NE.0 .AND. &
+!                INDEX(BDUM(1:),'frac').NE.0 ) THEN
+!                IT_CWX = IT_CWX - 20
+!        ELSE
+!!                if(me.eq.0)WRITE(IWR,'(2X,A)') 'No Dissolved Salt'
+!                IT_CWX = IT_CWX - 30
+!        ENDIF
+!      ELSEIF( INDEX(ADUM(1:),'withdrawl').NE.0 .OR. &
+!        INDEX(ADUM(1:),'production').NE.0 ) THEN
+!       ! VARB = 'Dissolved CO2 Option'
+!        IT_CWX = -1
+      ELSE
+        INDX = 4
+        CHMSG = 'Unrecognized Coupled Well Type: ' &
+         // ADUM(1:NCH)
+        CALL WRMSGS( INDX )
+      ENDIF
+!
+!---    Read number of well intervals  ---
+!
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        !CALL RD_INPL( CHDUM )
+        CALL LCASE( CHDUM )
+        ISTART = 1
+        VARB = 'Number of Well Intervals'
+        CALL RD_INT(ISTART,ICOMMA,CHDUM,NI_CW)
+        NIT_CW = NIT_CW + NI_CW              ! Total number of intervals of all wells-Bryan
+        LWI_CW = MAX( NI_CW,LWI_CW )         ! Max number of intervals that one well has among all - Bryan
+        DO 100 NICW = 1,NI_CW
+        !      CALL RD_INPL( CHDUM )
+                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        100   CONTINUE
+!
+!---    Read number of well times  ---
+!
+        VARB = 'Number of Well Times'
+        T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+       ! CALL RD_INPL( CHDUM )
+        CALL LCASE( CHDUM )
+        ISTART = 1
+        CALL RD_INT(ISTART,ICOMMA,CHDUM,IM_CWX)
+        LWT_CW = MAX( LWT_CW,IM_CWX )        ! Max number of time points that one well has among all - Bryan
+!
+!---    Loop over number of well times  ---
+!
+        DO 200 M = 1,IM_CWX
+        !      CALL RD_INPL( CHDUM )
+                T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        200   CONTINUE
+        500 CONTINUE
+!
+!---  Reset subroutine name  ---
+!   
+!        ISUB_LOG = ISUB_LOG-1
+!
+!---  End of RD_COUP_WELL group
+! 
+        RETURN
+      END
+	
+
+!----------------------Subroutine--------------------------------------!
+!
+      SUBROUTINE RD_PLANT
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------Copyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Read Plant Card for parameters.
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by MD White, PNNL, 29 October 2003.
+!     Last Modified by MD White, PNNL, 29 October 2003.
+!     $Id: step.F,v 1.51 2008/05/15 15:48:06 d3c002 Exp $
+!
+!----------------------Fortran 90 Modules------------------------------!
+!
+     USE SOLTN
+     USE PLT_ATM
+     USE GRID
+     USE FILES
+     USE GLB_PAR
+     USE BUFFEREDREAD
+!
+!----------------------Implicit Double Precision-----------------------!
+!
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+!
+!----------------------Type Declarations-------------------------------!
+!
+      CHARACTER*512 CHDUM
+      INTEGER::NCROPCX    
+!
+!----------------------Executable Lines--------------------------------!
+!      ISUB_LOG = ISUB_LOG+1
+!      SUB_LOG(ISUB_LOG) = '/RD_PLANT'
+      me = ga_nodeid()
+!
+!---  Assign card string  ---
+!
+      CARD = 'Plant Properties Card'
+!
+!---  Read number of plant varietals  ---
+!
+      T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+!      CALL RD_INPL( CHDUM )
+      CALL L_CASE( CHDUM )
+      ISTART = 1
+      VARB = 'Number of Plants'
+      CALL RD_INT(ISTART,ICOMMA,CHDUM,NPLANT)
+!      LPLANT = MAX( LPLANT,NPLANT )
+      NCROPCX = 0
+      ALLOCATE(NCROP_P(NPLANT))
+      NO_CROP = 0
+      DO IP = 1,NPLANT
+        IF (NO_CROP ==1) THEN
+          N_LINE = 3
+        ELSE 
+          N_LINE = 4
+        ENDIF
+        DO N = 1,N_LINE
+          T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        ENDDO
+        CALL L_CASE( CHDUM )
+        ISTART = 1
+        CALL CHKINT( ISTART,ICOMMA,CHDUM,INDX )
+        IF( INDX.EQ.1 ) THEN ! crop coefficients specified
+          ISTART = 1
+          CALL RDINT(ISTART,ICOMMA,CHDUM,NCROP_P(IP))
+          IF (NCROP_P(IP)>0) THEN  
+            IF (NCROP_P(IP)>NCROPCX) THEN
+              NCROPCX = NCROP_P(IP)
+            ENDIF
+            NO_CROP = 0
+          ELSEIF (NCROP_P(IP)==0) THEN ! in case "0," was used
+            NO_CROP = 1
+            NCROP_P(IP) = 0
+          ENDIF
+          T_OK = BUFFEREDREAD_GETLINE(CHDUM)
+        ELSE ! crop coefficients not specified
+          NO_CROP = 1
+          NCROP_P(IP) = -2
+        ENDIF
+      ENDDO
+      NCROPC = max(NCROPCX,2) 
+      ALLOCATE(CROP_P(2,NCROPC,NPLANT))
+!
+!---  End of RD_PLANT group
+!
+!      ISUB_LOG = ISUB_LOG-1
+      RETURN
+      END
+
+  
+!----------------------Subroutine--------------------------------------!
+!
+        SUBROUTINE L_CASE( CHDUM )
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------!opyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Convert all upper-case characters in a variable-length string
+!     variable to lower case.  This subroutine does not disturb
+!     non-alphabetic characters; only captial letters
+!     (ASCII 65 through 90) are modified.
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by WE Nichols, Battelle, March, 1991.
+!     Last Modified by MD White, Battelle, March 3, 1993.
+!     Last Modified by MD White, PNNL, 29 September 2002.
+!     $Id: step.F,v 1.51 2008/05/15 15:48:06 d3c002 Exp $
+!
+!----------------------Fortran 90 Modules------------------------------!
+!
+     USE SOLTN
+     USE GRID
+     USE GLB_PAR
+!
+!----------------------Implicit Double Precision-----------------------!
+!
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+!
+!----------------------Type Declarations-------------------------------!
+!
+      CHARACTER*(*) CHDUM
+!
+!----------------------Executable Lines--------------------------------!
+!
+!      ISUB_LOG = ISUB_LOG+1
+!      SUB_LOG(ISUB_LOG) = '/L_CASE'
+      DO 10 N = 1,LEN(CHDUM)
+        M = ICHAR(CHDUM(N:N))
+        IF( M .GE. 65 .AND. M .LE. 90 ) THEN
+                M = M + 32
+                CHDUM(N:N) = CHAR(M)
+        ENDIF
+     10 CONTINUE
+!
+!---  End of L_CASE group  ---
+!
+!      ISUB_LOG = ISUB_LOG-1
+     RETURN
+        END
 

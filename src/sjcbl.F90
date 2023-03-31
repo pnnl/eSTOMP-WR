@@ -1,6 +1,6 @@
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE SJCBL( NSL )
+      SUBROUTINE SJCBL( NSL,petsc_A )
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -111,11 +111,13 @@
     sc = vol(n)*dti
     nc = 1
     nr = 1
-    icol = loc_map(n)-1
+!    icol = loc_map(n)-1
+    icol = gloc_map(n)-1
     ic(1) = icol
     ir(1) = icol
     values_(1) = sc
-    call MatSetValuesLocal( petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr )
+    call MatSetValuesLocal(petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr )
+!    call MatSetValuesLocal( petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr )
 !       right hand side
     if(nsl.gt.nsolu) then
       residual(1,n) = residual(1,n) + co(nsl,n)*sc
@@ -163,8 +165,10 @@
       endif
       ap_up = dlz*fcl_up !nondiagonal of id_dn
       ap_dn = dlz*fcl_dn !diagonal of id_dn
-      irowdx = loc_map(id_dn)-1
-      irowux = loc_map(id_up)-1
+!      irowdx = loc_map(id_dn)-1
+!      irowux = loc_map(id_up)-1
+      irowdx = gloc_map(id_dn)-1
+      irowux = gloc_map(id_up)-1
       values_(1:4) = 0.d0
       nr = 2 
       nc = 2
@@ -198,8 +202,10 @@
       ap_dn = (alux+aldf+flb)*fcl_dn !diagonal of id_dn row !ae
       ab_dn = (alux+aldf)*fcl_up !non diagonal of id_dn row
       ab_up = (aldx+aldf)*fcl_dn !non diagonal of id_up row
-      irowdx = loc_map(id_dn)-1
-      irowux = loc_map(id_up)-1
+!      irowdx = loc_map(id_dn)-1
+!      irowux = loc_map(id_up)-1
+      irowdx = gloc_map(id_dn)-1
+      irowux = gloc_map(id_up)-1
       values_(1:4) = 0.d0
       nr = 2 
       nc = 2

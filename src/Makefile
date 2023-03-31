@@ -37,6 +37,7 @@ endif
 ifeq ($(findstring constance,$(SYSTEM)),constance)
    PETSC_ARCH  = intel
    PETSC_DIR   = /people/d3a926/lib/petsc-3.1-p8
+#   PETSC_DIR = /pic/scratch/hexi877/estomp_versions/petsc-3.3-p2
 #   PETSC_DIR   = /pic/projects/geophys/stomp-e4d/petsc-3.3-p7
    GA_DIR      = /people/d3a926/lib/exahdf/intel
    MPI_DIR     = /share/apps/openmpi/1.8.3/intel/15.0.1
@@ -197,6 +198,8 @@ SOURCEF = grid_mod.F90\
           e4d_setup.F90\
           e4d_run.F90\
           rd_chem.F90\
+          rdplant.F90\
+          roots.F90\
           rdbc1.F90\
           rdchr.F90\
           rddpr.F90\
@@ -207,8 +210,7 @@ SOURCEF = grid_mod.F90\
           rdinac.F90\
           rdini.F90\
           rdinpl.F90\
-          ucode1.F90\
-	  rdinpt1.F90\
+          rdinpt1.F90\
           rdint.F90\
           rdlrp.F90\
           rdmech.F90\
@@ -234,6 +236,7 @@ SOURCEF = grid_mod.F90\
           sjcbl.F90\
           smc1.F90\
           sorc1.F90\
+          soric1.F90\
           splinx.F90\
           spliny.F90\
           step.F90\
@@ -302,6 +305,8 @@ FOBJS =   \
           porsty.o\
           qsat1.o\
           rd_chem.o\
+          rdplant.o\
+          roots.o\
           rdbc1.o\
           rdchr.o\
           rddpr.o\
@@ -312,7 +317,6 @@ FOBJS =   \
           rdinac.o\
           rdini.o\
           rdinpl.o\
-          ucode1.o\
           rdinpt1.o\
           rdint.o\
           rdlrp.o\
@@ -335,6 +339,7 @@ FOBJS =   \
           rsdl1.o\
           smc1.o\
           sorc1.o\
+          soric1.o\
           splinx.o\
           spliny.o\
           step.o\
@@ -368,7 +373,11 @@ FOBJS =   \
           cflux1.o\
           cbnd1.o\
           sfxlb.o\
-          sfxl.o
+          sfxl.o\
+          ucode1.o\
+          well_w.o\
+          sort.o
+      
 
 ifeq ($(CPE4D),E4D)
 CP_OBJS = \

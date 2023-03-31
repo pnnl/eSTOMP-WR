@@ -235,7 +235,43 @@
 
 
 !
-!----------------------Subroutine--------------------------------------!
+!-ead ijk->value file and fill in i j k arrays
+      !! This function is meant to read only sparse ijk indices files
+      !! as the entire array is filled on proc 0 and then broadcast
+      !! to the other procs.
+      !>
+      logical function rd_sparse_ijk( filename,arr,dim1,dim2,nlines) result(ok)
+         implicit none
+!
+#include "mafdecls.fh"
+#include "global.fh"
+
+         character(*),intent(in) :: filename
+         integer,intent(in)      :: dim1,dim2
+         integer,intent(out)     :: arr(dim1,dim2)
+         integer,intent(out)     :: nlines
+
+
+         integer ierr
+         ok = .true.
+         nlines = 0
+         if (ga_nodeid() == 0) then
+            open(unit=11,file=filename, iostat=ierr,status="old")
+            if (ierr == 0) then
+               do while (ierr == 0)
+                  nlines = nlines + 1
+                  read(11,*,iostat=ierr) arr(nlines,1), arr(nlines,2),&
+                               arr(nlines,3)
+               enddo
+               close(11)
+               nlines= nlines -1
+            else
+               ok = .false.
+            endif
+         endif
+         call ga_brdcst(1, arr, sizeof(arr), 0)
+
+      end function
 !
       LOGICAL FUNCTION RDIJK1D( T_FILENAME,LDXX,LO,HI,VAR_OUT,VARX, &
         ISBIN,ISHDF5 ) RESULT( T_OK )

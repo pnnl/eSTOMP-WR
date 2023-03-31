@@ -1085,8 +1085,6 @@
       REAL*8 DCLX(LSPL),CLX(LSPL),ACTVX(LSPL+1,LSPL)
       REAL*8 VFX(LSPS+1)
       INTEGER IJM(LSPR)
-      LOGICAL :: USE_GA
-
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -1564,7 +1562,7 @@
       NSPH = MOD(ISPLK(1),100)
       IF( (NSTEP-NRST).EQ.0 ) THEN
 !fixed pH
-        FACTV(NSPH) = SP_CX(NSPH)
+        IF(NSPH > 0) FACTV(NSPH) = SP_CX(NSPH)
 !if(n==11) print *,'fact-',factv(nsph)
         DO 10 NSPKX = 1,NSPLK
           IF( ISPLK(14+NSPKX).LT.0 ) THEN
@@ -1775,7 +1773,9 @@
         ENDIF
   340 CONTINUE
 !fixed pH
-        IF( NSPH > 0 .and. nstep == nrst) THEN
+        IF( NSPH > 0 .and. nstep == nrst .and. (ieo == 1 .or. IC_SP(NSPH,N) > 10)) THEN !only noraml solution or overwritten
+!        IF( NSPH > 0 .and. nstep == nrst) then
+
             NSPX = NSPH
             VTOMX = 1.D+0/(SL(2,N)*PORD(2,N)*RHOL(2,N)*XLW(2,N))
             SP_CX(NSPX) = FACTV(NSPX)/ACTVS(NSPX)/VTOMX
@@ -3620,7 +3620,6 @@
 !
       CHARACTER*64 GETSPNM
       EXTERNAL GETSPNM
-      LOGICAL :: USE_GA
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -4920,7 +4919,8 @@
         IF( (IRCKT(IRCX).GE.10 .AND. IRCKT(IRCX).LE.12) .OR. &
           (IRCKT(IRCX).EQ.14) .OR. &
           (IRCKT(IRCX).EQ.16) .OR. &
-          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) ) THEN
+          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) .OR. & 
+           IRCKT(IRCX).EQ.120) THEN
 !
 !---      Equilibrium constants as a function of temperature  ---
 !
@@ -4962,7 +4962,8 @@
         IF( (IRCKT(IRCX).GE.10 .AND. IRCKT(IRCX).LE.12) .OR. &
           (IRCKT(IRCX).EQ.14) .OR. &
           (IRCKT(IRCX).EQ.16) .OR. &
-          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) ) THEN 
+          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) .OR. &
+           IRCKT(IRCX).EQ.120 ) THEN 
 !
 !---      Ion activity product mol/kg water, loop over species in
 !         kinetic reaction  ---
@@ -5036,7 +5037,8 @@
               VFMX = 1.D-3*SP_CX(NSPX)*SP_S(2,NSP_M)/SP_S(1,NSP_M)
             ENDIF
             IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
             VFMX = MAX( VFMX,1.D-5 )
 !
 !---      Secondary mineral, initial reactive surface area
@@ -5052,9 +5054,9 @@
             ENDIF
             VFMX = 1.D-3*SP_CX(NSPX)*SP_S(2,NSP_M)/SP_S(1,NSP_M)
             IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
             VFMX = MAX( VFMX,1.D-5 )
-!print *,'aox--',aox,vfmx,por_m(2,n),por(2,n),rs_s(1:2,nsp_m,n)
           ENDIF
 !
 !---      Reactive surface area  ---
@@ -5068,6 +5070,7 @@
 !---      Reaction rate, mol/s  ---
 !
           RRBX(M) = -AX*RRCX(M)*(1.D+0-(QX/EQKX(M)))
+          
 
 !          if(islc(43) >= 2) then
           IF( IRCKT(IRCX).EQ.16 ) THEN
@@ -5095,6 +5098,22 @@
             ENDIF
           ENDIF
 !
+!---      iex pH dependence  ---
+!
+          IF( IRCKT(IRCX).EQ.120 .AND. ISPLK(1).NE.0 ) THEN
+            NSP_PHX = MOD(ISPLK(1),100)
+            PHX = -LOG10(1.D-3*SP_CX(NSP_PHX)*VTOLX)
+!---        the first 8 spots already claimed for other parameters
+            N9 = MAX(1,N*IRCKN(NSPKX+9))
+            TRRBX = (1.D+1**(-RC_K(NSPKX+9,N9,IRCX)*PHX))
+!
+!---      iex simulation time dependence  ---
+!
+            N10 = MAX(1,N*IRCKN(NSPKX+10))
+            TRRBX = TRRBX*TM**(-RC_K(NSPKX+10,N10,IRCX))
+            RRBX(M) = RRBX(M)*TRRBX
+          ENDIF
+!
 !---      Reaction rate, mol/m^3 aqu s  ---
 !
           RRBX(M) = RRBX(M)*VTOLX/VOL(N)
@@ -5113,7 +5132,8 @@
             .OR. IRCKT(IRCX).EQ.11 ) THEN
             RRBX(M) = MAX( RRBX(M),0.D+0 )
           ELSEIF( IRCKT(IRCX).EQ.7 .OR. IRCKT(IRCX).EQ.9 &
-            .OR. IRCKT(IRCX).EQ.12 .OR. IRCKT(IRCX).EQ.14 ) THEN
+            .OR. IRCKT(IRCX).EQ.12 .OR. IRCKT(IRCX).EQ.14 &
+            .OR. IRCKT(IRCX).EQ.120 ) THEN
             RRBX(M) = MIN( RRBX(M),0.D+0 )
           ENDIF
 !
@@ -5447,7 +5467,8 @@
               VFMX = 1.D-3*SP_CX(NSPX)*SP_S(2,NSP_M)/SP_S(1,NSP_M)
             ENDIF
             IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
             VFMX = MAX( VFMX,1.D-5 )
 !
 !---      Secondary mineral, initial reactive surface area
@@ -5463,7 +5484,8 @@
             ENDIF
             VFMX = 1.D-3*SP_CX(NSPX)*SP_S(2,NSP_M)/SP_S(1,NSP_M)
             IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
             VFMX = MAX( VFMX,1.D-5 )
           ENDIF
 !
@@ -5870,7 +5892,8 @@
             IF( (IRCKT(IRCX).GE.10 .AND. IRCKT(IRCX).LE.12) .OR. &
               (IRCKT(IRCX).EQ.14) .OR. &
               (IRCKT(IRCX).EQ.16) .OR. &
-              (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) ) THEN
+              (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) .OR. &
+               IRCKT(IRCX).EQ.120 ) THEN
 !
 !---          Ion activity product mol/kg water, loop over species in
 !             kinetic reaction  ---
@@ -5976,7 +5999,8 @@
                   VFMX = 1.D-3*SP_CXX*SP_S(2,NSP_M)/SP_S(1,NSP_M)
                 ENDIF
                 IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                    (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                    (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
                 VFMX = MAX( VFMX,1.D-5 )
 !
 !---          Secondary mineral, initial reactive surface area
@@ -5992,7 +6016,8 @@
                 ENDIF
                 VFMX = 1.D-3*SP_CXX*SP_S(2,NSP_M)/SP_S(1,NSP_M)
                 IF( (IRCKT(IRCX).NE.7) .AND. (IRCKT(IRCX).NE.9) .AND. &
-                    (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) ) &
+                    (IRCKT(IRCX).NE.12) .AND. (IRCKT(IRCX).NE.14) .AND. &
+                 IRCKT(IRCX).NE.120 ) &
                 VFMX = MAX( VFMX,1.D-5 )
               ENDIF
 !
@@ -6041,6 +6066,31 @@
                 ENDIF
               ENDIF
 !
+!---          iex pH and simulation time dependence  ---
+!
+              IF( IRCKT(IRCX).EQ. 120 .AND. ISPLK(1).NE.0 ) THEN
+                NSP_PHX = MOD(ISPLK(1),100)
+!
+!---            Incremented species  ---
+!
+                IF( NSP_PHX.EQ.NSP ) THEN
+                  SP_CXX = SP_CX(NSP_PHX)+DSP_CX(NSP_PHX)
+!
+!---            Unincremented species  ---
+!
+                ELSE
+                  SP_CXX = SP_CX(NSP_PHX)
+                ENDIF
+                PHX = -LOG10(1.D-3*SP_CXX*VTOLX)
+                N9 = MAX(1,N*IRCKN(NSPKX+9))
+                TRRX = (1.D+1**(-RC_K(NSPKX+9,N9,IRCX)*PHX))
+
+                N10 = MAX(1,N*IRCKN(NSPKX+10))
+                TRRX = TRRX * TM**(-RC_K(NSPKX+10,N10,IRCX))
+                RRX = RRX*TRRX
+  
+              ENDIF
+!
 !---          Reaction rate, mol/m^3 aqu s  ---
 !
               RRX = RRX*VTOLX/VOL(N)
@@ -6051,7 +6101,8 @@
                 .OR. IRCKT(IRCX).EQ.11 ) THEN
                 RRX = MAX( RRX,0.D+0 )
               ELSEIF( IRCKT(IRCX).EQ.7 .OR. IRCKT(IRCX).EQ.9 &
-                .OR. IRCKT(IRCX).EQ.12 .OR. IRCKT(IRCX).EQ.14 ) THEN
+                .OR. IRCKT(IRCX).EQ.12 .OR. IRCKT(IRCX).EQ.14 &
+                .OR. IRCKT(IRCX).EQ.120 ) THEN
                 RRX = MIN( RRX,0.D+0 )
               ENDIF
 !
@@ -6965,7 +7016,8 @@
 !---    Dissolution-precipitation kinetic reaction  ---
 !
         IF( (IRCKT(IRCX).GE.10 .AND. IRCKT(IRCX).LE.12) .OR. &
-          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) ) THEN
+          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) .OR. &
+           IRCKT(IRCX).EQ.120) THEN
 !
 !---      Equilibrium constants as a function of temperature  ---
 !
@@ -8379,7 +8431,8 @@
 !---    TST kinetic reaction  ---
 !
         IF( (IRCKT(IRCX).GE.10 .AND. IRCKT(IRCX).LE.12) .OR. &
-          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) ) THEN
+          (IRCKT(IRCX).GE.5 .AND. IRCKT(IRCX).LE.9) .OR. &
+           IRCKT(IRCX).EQ.120 ) THEN
 !
 !---      Ion activity product mol/kg water, loop over species in
 !         kinetic reaction  ---
@@ -8475,6 +8528,18 @@
             ENDIF
           ENDIF
 !
+!---      iex pH and simulation time dependence  ---
+!
+          IF( IRCKT(IRCX).EQ.120 .AND. ISPLK(1).NE.0 ) THEN
+            NSP_PHX = MOD(ISPLK(1),100)
+            PHX = -LOG10(1.D-3*SP_CX(NSP_PHX)*VTOLX)
+            N9 = MAX(1,N*IRCKN(NSPKX+9))
+            RRBX = RRBX*(1.D+1**(-RC_K(NSPKX+9,N9,IRCX)*PHX))
+
+            N10 = MAX(1,N*IRCKN(NSPKX+10))
+            RRBX = RRBX*TM**(-RC_K(NSPKX+10,N10,IRCX))
+          ENDIF
+!
 !---      Reaction rate, mol/m^3 aqu s  ---
 !
           RRBX = RRBX*VTOLX/VOL(N)
@@ -8485,7 +8550,7 @@
             .OR. IRCKT(IRCX).EQ.11 ) THEN
             RRBX = MAX( RRBX,0.D+0 )
           ELSEIF( IRCKT(IRCX).EQ.7 .OR. IRCKT(IRCX).EQ.9 &
-            .OR. IRCKT(IRCX).EQ.12 ) THEN
+            .OR. IRCKT(IRCX).EQ.12 .OR. IRCKT(IRCX).EQ.120) THEN
             RRBX = MIN( RRBX,0.D+0 )
           ENDIF
 !
@@ -9062,7 +9127,6 @@
       INTEGER ISPX(LSPR)
       CHARACTER*64 GETSPNM
       EXTERNAL GETSPNM
-      LOGICAL :: USE_GA
 !
 !----------------------Executable Lines--------------------------------!
 !

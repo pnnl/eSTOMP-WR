@@ -516,6 +516,8 @@
       integer :: petsc_option
       REAL(KIND=DP) :: ATOL
       REAL(KIND=DP) :: RTOL
+      INTEGER :: ISUB_LOG
+      CHARACTER(32), DIMENSION(:), ALLOCATABLE :: SUB_LOG
 !
 !---  End of module  ---
 !
@@ -673,11 +675,12 @@
       INTEGER :: LBD=0,LSP=1,LPT=0
       INTEGER :: LBC=1,LBCIN=1,LBTM=1
       INTEGER :: LSR=1,LSTM=1,LNW=1,LNWT=1,LNWS=1
+      INTEGER :: L_CW=0,LN_CW=1,LWI_CW=1,LWT_CW=1 ! coupled well - Bryan
       INTEGER :: LRC=1,LSOLU=1,LCN=1
       INTEGER :: LREF=1,LPTM=1,LSF=1,LSFDOM=1
       INTEGER :: LOBDT=1,LOBDS=1
       INTEGER :: LTBL=0,LCHEM=1,LRK=1,LUGR=0,LGRL=1
-      INTEGER :: LPTA=0,LPLANT=1,LSW=0,LATM=1,LNNGC=1
+      INTEGER :: LPTA=0,LPLANT=0,LSW=0,LATM=1,LNNGC=1
       INTEGER :: LBAL=1,LREM=1,LREL=1,LHYD=0,LR=0
       INTEGER :: LANW=1,LGC=0
       INTEGER :: LUK=1
@@ -1488,6 +1491,7 @@
       INTEGER, DIMENSION(:,:), ALLOCATABLE ::  IC_NCG
       INTEGER, DIMENSION(:), ALLOCATABLE ::  I_LV
       CHARACTER(64), DIMENSION(:), ALLOCATABLE :: INHNM
+      INTEGER, DIMENSION(:), ALLOCATABLE :: IPTP,IPCR  ! Add for EOS-Bryan
 !
 !---  End of module  ---
 !
@@ -1556,7 +1560,9 @@
       INTEGER, DIMENSION(:), ALLOCATABLE ::  MLUC
       INTEGER, DIMENSION(:), ALLOCATABLE ::  NLUC
       integer, dimension(:), pointer :: imxp
+      integer, dimension(:), pointer :: imxp_ncw ! for coupled well - BH
       integer, dimension(:), allocatable :: loc_map
+      integer, dimension(:), allocatable :: gloc_map ! 2 matrix -BH
       integer, dimension(:), allocatable :: nnz_o
       integer, dimension(:), allocatable :: nnz_d
       INTEGER :: ISVC
@@ -2190,15 +2196,30 @@
       REAL(KIND=DP) :: ATMST
       REAL(KIND=DP) :: SWBCD
       REAL(KIND=DP), DIMENSION(2) :: RWRO
+      REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: RSD_P
+      REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: PLF_P
+      INTEGER, DIMENSION(:), ALLOCATABLE :: IPLF_P
+      REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: veg_bc
+      INTEGER, DIMENSION(:), ALLOCATABLE :: veg_type
+      REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: veg_varx
+      REAL(KIND=DP), DIMENSION(:,:), pointer ::  veg_sink
+      REAL(KIND=DP), DIMENSION(:,:), pointer ::  et
+      REAL(KIND=DP), DIMENSION(:,:), pointer ::  wiltf
+      REAL(KIND=DP), DIMENSION(:), pointer ::  root_fr
+      INTEGER, DIMENSION(:), pointer ::  ibpft
+      INTEGER :: IPLANT
+      INTEGER :: LPFT
       INTEGER :: NPLANT
       INTEGER :: NATM_T
       INTEGER :: IATM_C
-      INTEGER, DIMENSION(:), ALLOCATABLE :: IRSM_P
+      INTEGER :: NCROPC
       CHARACTER(64), DIMENSION(:), ALLOCATABLE ::  PLANT
       INTEGER, DIMENSION(:), ALLOCATABLE :: ITMP_P
       INTEGER, DIMENSION(:), ALLOCATABLE :: IALB_P
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ISRM_P
       INTEGER :: ISWBCF
+      INTEGER, DIMENSION(:), ALLOCATABLE :: NCROP_P
+      REAL(KIND=DP), DIMENSION(:,:,:), ALLOCATABLE :: CROP_P
+      REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: CRF ! cumulative root fraction
 !
 !---  End of module  ---
 !
@@ -2612,4 +2633,112 @@
 !---  End of module  ---
 !
       END MODULE
+
+      MODULE COUP_WELL  ! Well model - Bryan
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------Copyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Coupled well variables
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by MD White, PNNL, 10 January 2011.
+!     $Id: allo.F,v 1.3 2011/09/09 17:15:36 d3c002 Exp $
+!
+!----------------------Fortran 90 Modules-----------------------!
+!
+        USE DB_PR
+!
+!----------------------Type Declarations-------------------------------!
+!
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: DNR_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: FF_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: FX_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: FXA_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: FXE_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: FXW_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: P_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: PF_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: PL_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: QM_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: G_QM_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: RS_CW
+        REAL(KIND=DP) :: RSD_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: SK_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: TML_CW
+        REAL(KIND=DP), DIMENSION(:,:,:), ALLOCATABLE :: VAR_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: WBR_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: XP_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: YP_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: ZP_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: XTP_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: YTP_CW
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: ZTP_CW
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: blu_cw
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: dxgfn_cw
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: dygfn_cw
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: dzgfn_cw
+        double precision, dimension(:,:,:), allocatable :: p_cw_table
+        double precision, dimension(:,:), allocatable :: t_acwx
+        INTEGER, DIMENSION(:), ALLOCATABLE :: ICC_CW
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: ID_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IM_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: INV_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IREF_CW
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: IS_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IT_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: gIT_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IWF_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IWN_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IWP_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: IWI_CW
+        INTEGER, DIMENSION(:), ALLOCATABLE :: JM_CW
+        INTEGER, DIMENSION(:,:), ALLOCATABLE :: KLU_CW
+        INTEGER :: N_CW,NSD_CW,NWF_CW,NWN_CW,NIT_CW,N_CW_SOLU
+        integer :: l_nwf_cw,l_nwn_cw,n_l_cw,wlstart,lwstart,lstart_cw
+        integer, dimension(:), allocatable :: g_iwf_cw
+        integer, dimension(:), allocatable :: nnz_o_cw
+        integer, dimension(:), allocatable :: nnz_d_cw
+        integer, dimension(:), allocatable :: w_loc
+        integer, dimension(:), pointer :: iwt_cw
+        integer, dimension(:), allocatable :: mmap_cw
+        INTEGER, DIMENSION(:), ALLOCATABLE :: MCW,MFD
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE :: P_CW_G
+        INTEGER:: write_well_flux(2),IWAF,IWSF
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::q_flux_cw
+        REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::q_total_cw
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE ::c_flux_cw
+        REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE ::c_total_cw 
+!
+!---  End of module  ---
+!
+        END MODULE
+
 

@@ -64,6 +64,7 @@
       USE BCVP
       USE BCV
       USE GRID_MOD
+      USE PLT_ATM
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -154,6 +155,7 @@
 !--- Inflow  ---
 !
               ELSE
+                IF( IBCT(NBCT,NB).EQ.24.and. lplant == 1) BCXX = 0.d0
                 IF( IBCD(NB).LT.0 )THEN
                   C_FLUX_B(NSL,NB) = C_FLUX_B(NSL,NB) - BCXX*FCLP*FLB
                 ELSE

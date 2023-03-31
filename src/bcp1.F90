@@ -62,6 +62,7 @@
       USE BCV
       use grid_mod
       use grid
+      USE PLT_ATM
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -103,11 +104,15 @@
 !
       REAL*8 BCX(LBCV)
       real*8 pgbx(isvc+2),tbx(isvc+2)
+      real*8, dimension(:,:), allocatable :: beta
       integer, dimension(:), allocatable :: ncntx
       integer :: nrfx
       LOGICAL :: use_ga,t_ok
       integer, pointer ::i_bid(:), i_bidi(:), i_bidj(:),i_bidk(:)
       character(len=64):: format_110
+      integer :: pft
+      integer :: ix_x,iy_x,iz_x
+      REAL*8 :: c_coef 
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -150,6 +155,7 @@
       endif
       nhdcx = 0
 !      write(*,*) 'me,num_bcnx',me,num_bcnx
+      if(lplant > 0) veg_bc(:) = 0.d0
       DO 400 NB = 1,num_bcnx
         ib = i_bid(nb)
         TMZ = TM
@@ -594,6 +600,12 @@
 !              PLX = PLX + ABS(BCX(2))*PEFX*DB*VISL(M,N)/PERM(IBD,IZN)
 !     &          + RHOL(M,N)*GB
 !            ENDIF
+          if(lplant == 1) then
+!             print *, "lplant =", lplant, "BCX(2) = ", BCX(2)
+              call parse_id_local(n,ix_x,iy_x,iz_x)
+              lndx = ix_x + (iy_x-1)*ldx
+              veg_bc(lndx) = bcx(2)
+          else
             IF( IBCD(NB).LT.0 ) THEN
               PLX = PLX - ABS(BCX(2))*DB*VISL(M,N)/ &
               (PERM(IBD,N)*RKL(IBD,M,N)) + RHOL(M,N)*GB
@@ -608,6 +620,7 @@
             ELSE
               IBCT(IEQW,NB) = 24
             ENDIF
+          endif 
 !
 !---      X-Y-Z Aqueous Hydraulic Gradient
 !
@@ -898,18 +911,84 @@
           PLB(M,NB) = PLX - PATM
           PGB(M,NB) = PGX - PATM
           TB(M,NB) = TX
-          
-!          write(*,*) 'me,NB,final pressure',me,nb,plx-PATM 
-!          write(*,'(a,I3X,3(I6X))') 'me,lx,ly,lz: ',me,ldx,ldy,ldz
-!          write(*,'(a,3(I6),3(F16.8),F20.10)')'me,nb,ib,xc,yc,zc,plx:',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),plx-patm
   200     CONTINUE
   300   CONTINUE
   400 CONTINUE
+      if(lplant == 1) then
+        if(.not. allocated(beta)) allocate(beta(isvc+2,ldx*ldy))
+        beta = 0.d0
+!        call ga_dgop(1,veg_bc,ldx*ldy,'+')
+        do m = 2,isvc+2
+          do lndx = 1,ldx*ldy
+            if(veg_varx(2,lndx) > 0.d0) then
+              zsurf = veg_varx(1,lndx)
+              ix = int(veg_varx(2,lndx))
+              iy = int(veg_varx(3,lndx))
+              pft = int(veg_varx(4,lndx))
+              beta(m,lndx) = 0.d0
+              do izz = 1, ldz
+                ndx = ix + (iy-1)*ldx + (izz-1) * ldx * ldy
+                if(id_g2l(ndx) > 0 .and. ixp(ndx)>0 ) then
+                  if ((rsd_p(1,pft) == 0.d0) .or. &
+                     ((rsd_p(1,pft) > 0.d0).and.&
+                      ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then 
+                      z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
+                      z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
+                    if (IPLF_P(pft)>=3) then
+                      smp = (pg(m,ndx)-pl(m,ndx))/rhol(m,ndx)/grav
+                      call soil_stress (pft, smp, z_up, z_bt, wiltf(m,ndx))
+                      beta(m,lndx) = beta(m,lndx)+wiltf(m,ndx)*root_fr(ndx)
+                    elseif (IPLF_P(pft) == 1 .or. IPLF_P(pft) == 2) then
+                      call roots(root_fr(ndx),z_up,z_bt,pft,izz,ndx)
+                      beta(m,lndx) = beta(m,lndx)+root_fr(ndx)
+                    endif
+                  endif 
+                endif
+              enddo
+            endif
+          enddo
+        enddo
+!        call ga_dgop(1,beta,lsv*ldx*ldy,'+')    
+        do m = 2,isvc+2
+          do lndx = 1,ldx*ldy
+            if(veg_varx(2,lndx) > 0.d0) then
+              bcx(2) = veg_bc(lndx)
+              zsurf = veg_varx(1,lndx)
+              ix = int(veg_varx(2,lndx))
+              iy = int(veg_varx(3,lndx))
+              pft = int(veg_varx(4,lndx))
+              do izz = 1, ldz
+                ndx = ix + (iy-1)*ldx + (izz-1) * ldx * ldy
+                if(id_g2l(ndx) > 0 .and. ixp(ndx)>0) then
+                  if ((rsd_p(1,pft) == 0.d0) .or. &
+                     ((rsd_p(1,pft) > 0.d0).and.&
+                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
+                    if (IPLF_P(pft)>=3) then
+                      veg_sink(m,ndx) =-bcx(2) * wiltf(m,ndx)*root_fr(ndx) &
+                        *dxgf(ndx) * dygf(ndx)
+                    elseif (IPLF_P(pft) == 1 .or. IPLF_P(pft) == 2) then
+                      if (beta(m,lndx) > 1) then
+                        root_fr(ndx) = root_fr(ndx)/beta(m,lndx)
+                      endif
+                      veg_sink(m,ndx) =-bcx(2) * root_fr(ndx) &
+                                   * dxgf(ndx) * dygf(ndx)
+                    endif
+                    veg_sink(m,ndx) = veg_sink(m,ndx)*rhol(m,ndx)
+                    call crop_coeff(pft,TM,c_coef)
+                    et(m,ndx) =c_coef*bcx(2) * beta(m,lndx)
+                    veg_sink(m,ndx) = veg_sink(m,ndx)*c_coef
+                  endif
+                endif
+              enddo
+            endif
+          enddo
+        enddo
+!        call ga_dgop(1,et,lsv*ldx*ldy,'+')
+      endif
       ICSN = ICSN-ICSNX
       SUBNM = SUBNM(1:ICSN)
 !
 !---  End of BCP1 group
 !
       RETURN
-        END
-
+      ENDSUBROUTINE BCP1

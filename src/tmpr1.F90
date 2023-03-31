@@ -86,6 +86,7 @@
       ICSN = ICSN+ICSNX
       DO 400 N = 1,num_nodes
         IF( IXP(N).LE.0 ) GOTO 400
+
         PGX = PG(2,N) + PATM
         DO 300 M = 2,ISVC+2
           PLX = PL(M,N) + PATM

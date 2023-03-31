@@ -61,6 +61,7 @@
       USE BCV
       use grid_mod
       use trnspt
+      use coup_well
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -198,6 +199,22 @@
 !  180     CONTINUE
 !  190   CONTINUE
 !      ENDIF
+!*************Coupled well - Bryan******************************
+!---  Loop over coupled-well times
+!     compute time step to next coupled-well transition  ---
+!
+       DT_CW = BIG
+       DO 240 NCW = 1,N_CW
+         TMZ = TM
+         IF( ICC_CW(NCW).EQ.1 ) TMZ = MOD( TM,VAR_CW(1,IM_CW(NCW),NCW) )
+         DO 230 M = 2,IM_CW(NCW)
+           DT_CWX = DT_CW
+           IF( VAR_CW(1,M,NCW)-TMZ.GT.TMTOL ) &
+            DT_CW = MIN( DT_CW,VAR_CW(1,M,NCW)-TMZ )
+           IF( (TM+DT_CW).EQ.TM ) DT_CW = DT_CWX
+  230   CONTINUE
+  240 CONTINUE
+!******************************************************************
 !
 !---  Compute the next step based on the minimum of
 !     the incremented time step, the time step to quit,
@@ -213,8 +230,8 @@
 !     or the maximum time step  ---
 !
 
-
-      DT = MIN( DTNX,DTQU,DTPR,DTBC,DTSR,DTOB,DTEP,DTMX )
+      DT = MIN( DTNX,DTQU,DTPR,DTBC,DTSR,DTOB,DTEP,DTMX,DT_CW )
+!      DT = MIN( DTNX,DTQU,DTPR,DTBC,DTSR,DTOB,DTEP,DTMX )
 
       IF( LWELL.EQ.1 ) DT = MIN( DT,DTWL )
       DTI = 1.D+0/(DT+SMALL)

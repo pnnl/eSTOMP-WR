@@ -153,6 +153,9 @@
 !
   INTEGER NCX(LSF),ISFCX(6)
   LOGICAL IFLAG
+  REAL*8:: idr(3),max_idr
+  integer:: id_max
+  integer:: vx_ceil,vy_ceil,vz_ceil
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -533,6 +536,7 @@
 !    ELSE
       NSFDOMX = 1
 !    ENDIF
+!    write(*,*) 'NS: ', NS
     DO 6900 NC = 1,NSFDOMX
 !    IF( ISFD(NS).EQ.4 ) THEN
 !      ISFDX = ISFDOM(4,NC,NS)
@@ -558,6 +562,7 @@
      do nx = 1, num_loc_nodes
        n = id_l2g(nx)
        if(ixp(n) == 0.or.isfc(ns,n)<=0) cycle
+!       write(*,*) 'nx,n:',nx,n
        do ifcx = 1,6
 !            NPZ = NSZ(N)
          icnx = nd2cnx(ifcx,n)
@@ -579,12 +584,32 @@
            endif
          endif
          isfdx = isfd(ns)
-         if(abs(v_x*isfdx) == 1.d0 .or. abs(v_y*isfdx) == 2.d0 .or. abs(v_z*isfdx) == 3.d0) then
-!         if(abs(isfdx) == 1.d0 .or. abs(isfdx) == 2.d0 .or. abs(isfdx) == 3.d0) then
+!         write(*,*) 'vx*isfdx,vy*isfdx,vz*isfdx: ',v_x*isfdx,v_y*isfdx,v_z*isfdx
+!BH account for bfg
+         if (ics.ne.3 .and. ics .ne. 8) then
+            if(abs(v_x*isfdx) == 1.d0 .or. abs(v_y*isfdx) == 2.d0 .or. abs(v_z*isfdx) == 3.d0) then
+               go to 9000
+            else
+               go to 9100
+            endif
+         else
+            vx_ceil = ceiling(abs(v_x*isfdx))
+            vy_ceil = ceiling(abs(v_y*isfdx))
+            vz_ceil = ceiling(abs(v_z*isfdx))
+!            write(*,*) 'vx_ceil,vy_ceil,vz_ceil:',vx_ceil,vy_ceil,vz_ceil
+            if(vx_ceil == 1 .or. vy_ceil == 2 .or. vz_ceil == 3) then       
+                go to 9000
+            else
+                go to 9100
+            endif
+         endif
+!BH
+         9000 continue         
          q_fx = 0.0d0
          c_fx = 0.0d0
          icnx = nd2cnx(ifcx,n)
 !         print *, 'icnx: ',icnx
+!         write(*,*) 'nx,n,ifcx,icnx:',nx,n,ifcx,icnx
          if(icnx > 0) then
             areaxx = areac(icnx)
             id_up = conn_up(icnx)
@@ -593,11 +618,36 @@
             if(n.eq.id_up .and. isfdx > 0) cycle
 !            q_fx = q_flux(1,icnx)
             idirx = abs(isfdx)
+!            write(*,*) 'isfdx: ',isfdx,' idirx: ',idirx
             if(isfdx > 0 ) then
                 q_fx = q_flux_nd(idirx,id_up)
             else
                 q_fx = q_flux_nd(idirx,id_up)
             endif
+            if (ics.eq.3 .or. ics .eq. 8) then  
+               if (vx_ceil == 1) then
+                 q_fx = sqrt(v_x**2/(v_x**2+v_y**2+v_z**2))*q_fx
+               else if (vy_ceil == 2) then
+                 q_fx = sqrt(v_y**2/(v_x**2+v_y**2+v_z**2))*q_fx
+! Fluxes from horizontal directions are dominant
+! Top and bottom faces are not fixed yet. -BH
+!               else if (vz_ceil == 3) then
+!                 qx = q_flux_nd(1,id_up)
+!                 qy = q_flux_nd(2,id_up)
+!                 qz = q_flux_nd(3,id_up)
+!                 do ifcx_z = 1,4
+!                    icnx_z = nd2cnx(ifcx_z,n)
+!                    if (icnx_z>0) then
+!                      v_tmp(1) = unvxc(icnx_z)
+!                      v_tmp(2) = unvyc(icnx_z)
+!                      v_tmp(3) = unvzc(icnx_z)
+!                      if
+!                      qz = qz+sqrt(v_z**2/(v_x**2+v_y**2+v_z**2))*qx + &
+!                         sqrt(v_y**2/(v_x**2+v_y**2+v_z**2))*qy
+               endif
+            endif          
+!            write(*,*) 'q_fx:',q_fx
+!            write(*,*) 'isft:',isft(ns)
             if( isft(ns).gt.100 .and.  &
                isft(ns).le.(100+nsolu) ) then
               nsl = isft(ns)-100
@@ -606,6 +656,7 @@
               else
                 c_fx = c_flux_nd(idirx,nsl,id_up)
               endif
+!              write(*,*) '0 c_fx:',c_fx
             elseif (isft(ns).gt.(100+nsolu) .and. &
               isft(ns).le.(100+nsolu+neqc+neqk)) then
               nsl = isft(ns)-100
@@ -614,6 +665,7 @@
               else
                 c_fx = c_flux_nd(idirx,nsl,id_up)
               endif
+!              write(*,*) '1 c_fx:',c_fx
             endif
             if(q_fx > 0.d0) then
               rholx = rhol(2,id_dn)
@@ -830,7 +882,8 @@
 !   1400         CONTINUE
 !   1500       CONTINUE
 !   1600     CONTINUE
-        endif
+!        endif
+       9100 continue
       enddo
     enddo
    6900 CONTINUE

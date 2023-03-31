@@ -2,7 +2,7 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE SORT1( NSL )
+      SUBROUTINE SORT1( NSL,petsc_a )
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -62,6 +62,7 @@
       USE BCVP
       USE CONST
       use petscapp
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -311,7 +312,8 @@
 !               off-diagonal to 0, to force the concentration to be the 
 !               solubility limit.  ---
 !
-                 ir(1) = loc_map(n)-1
+!                 ir(1) = loc_map(n)-1
+                 ir(1) = gloc_map(n)-1
                  ic(1) = ir(1)
              !   ir = loc_map(n)-1
              !   ic = ir
@@ -330,8 +332,10 @@
                    id_dn = conn_dn(icnx)
                    if(id_up.eq.n) id_nx = id_dn
                    if(id_dn.eq.n) id_nx = id_up
-                   ir(1) = loc_map(n)-1
-                   ic(1) = loc_map(id_nx)-1
+                   ir(1) = gloc_map(n)-1
+                   ic(1) = gloc_map(id_nx)-1
+             !      ir(1) = loc_map(n)-1
+             !      ic(1) = loc_map(id_nx)-1
              !      ic(1) = ir(1)
              !      ir = loc_map(id_nx)-1
              !      ic = ir
@@ -466,7 +470,8 @@
 !
           values_ = 0.d0
           IF( IADDVAL.EQ.1 ) THEN
-             ir(1) = loc_map(n)-1
+             ir(1) = gloc_map(n)-1
+!             ir(1) = loc_map(n)-1
              ic(1) = ir(1)
              nr = 1
              nc = 1

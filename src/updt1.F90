@@ -64,6 +64,7 @@
       USE FDVP
       USE CONST
       use grid_mod
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -124,10 +125,8 @@
           DPL = ABS( CPGL-PG(2,N)+PL(2,N) )
           DPL = MIN( DPL,ABS(blu(ieqw,n)) )
           DPL = SIGN( DPL,blu(ieqw,n) )*RLXF
-!        if(N==52003)  write(*,*) '000 DPL',DPL
         ELSE
           DPL = blu(ieqw,n)*RLXF
-!        if(N==52003)  write(*,*) '111 DPL',DPL
         ENDIF
         pllx = 0.d0
 !
@@ -136,7 +135,6 @@
 !
         IF( PG(2,N)-PL(2,N)-PAE.GT.ZERO .AND. &
           PG(2,N)-PL(2,N)-PAE-DPL.LT.ZERO ) DPL = 6.D-1*DPL
-!       if(N==52003) write(*,*) '222 DPL',DPL
         PL(2,N) = PL(2,N) + DPL
 !
 !---  Check for excessive aqueous pressure  ---
@@ -208,6 +206,16 @@
             NPHAZ(2,N) = NPHAZ(1,N)
             IPH(2,N) = IPH(1,N)
   400     CONTINUE
+!***********Coupled well - Bryan************************
+!
+!---      Coupled-well pressure  ---
+!
+      IF( L_CW.EQ.1 ) THEN
+        DO 402 NCW = 1,N_CW
+          P_CW(2,NCW) = P_CW(1,NCW)
+      402       CONTINUE
+      ENDIF
+!******************************************************
 !
 !---  Number of time step reductions failure: stop simulation  ---
 !
@@ -218,6 +226,16 @@
             NPHAZ(2,N) = NPHAZ(1,N)
             IPH(2,N) = IPH(1,N)
   410     CONTINUE
+!************Coupled well - Bryan**********************
+!
+!---      Coupled-well pressure  ---
+!
+      IF( L_CW.EQ.1 ) THEN
+        DO 412 NCW = 1,N_CW
+          P_CW(2,NCW) = P_CW(1,NCW)
+        412       CONTINUE
+      ENDIF
+!******************************************************
           if(me.eq.0)WRITE(ISC,'(10X,A)') '---  Time Step Reduction Limit Exceeded ---'
           if(me.eq.0)WRITE(IWR,'(10X,A)') '---  Time Step Reduction Limit Exceeded ---'
           ICNV = 4

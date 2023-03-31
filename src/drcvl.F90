@@ -165,7 +165,7 @@
       idr(1) = unvxc(iconn)
       idr(2) = unvyc(iconn)
       idr(3) = unvzc(iconn)
-!     if (ics/=3 .AND. ics/=8 ) then
+     if (ics/=3 .AND. ics/=8 ) then
       if(idr(1) /= 0) then
         q_flux_nd(1,id_up) = q_flux(1,iconn)
       elseif(idr(2) /= 0) then
@@ -174,17 +174,17 @@
         q_flux_nd(3,id_up) = q_flux(1,iconn)
       endif
 !BH
-!     else
-!      max_idr = 0.0
-!      id_max = 0
-!      do i_dir = 1, 3
-!         if (abs(idr(i_dir))>=max_idr) then
-!            max_idr = abs(idr(i_dir))
-!            id_max = i_dir
-!         endif
-!      enddo
-!      q_flux_nd(id_max,id_up) = q_flux(1,iconn)
-!     endif 
+     else
+      max_idr = 0.0
+      id_max = 0
+      do i_dir = 1, 3
+         if (abs(idr(i_dir))>=max_idr) then
+            max_idr = abs(idr(i_dir))
+            id_max = i_dir
+         endif
+      enddo
+      q_flux_nd(id_max,id_up) = q_flux(1,iconn)
+     endif 
 !BH
     enddo
   enddo

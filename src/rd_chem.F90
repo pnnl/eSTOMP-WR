@@ -2005,6 +2005,12 @@
                 IRCKT(NRC) = 14
                 IF( ME.EQ. 0) WRITE(IWR,*) 'Glass'
               ENDIF
+!Fang
+            ELSE IF( INDEX(ADUM(1:),'time dependency').NE.0 ) THEN
+              IF( INDEX(ADUM(1:),'toward reactants').NE.0 ) THEN
+                IRCKT(NRC) = 120
+                IF( ME.EQ. 0) WRITE(IWR,*) 'IEX pH and time dependency'
+              ENDIF
             ELSE
               IF( INDEX(ADUM(1:),'toward products').NE.0 ) THEN
                 IRCKT(NRC) = 6
@@ -2083,7 +2089,7 @@
           (IRCKT(NRC).GE.5 .AND. IRCKT(NRC).LE.9) .OR. &
           (IRCKT(NRC).EQ.14 ) .OR. &
           (IRCKT(NRC).EQ.16 ) .OR. &
-          IRCKT(NRC).EQ.20 ) THEN
+          IRCKT(NRC).EQ.20 .OR. IRCKT(NRC).EQ.120) THEN
 !
 !---      Allow for returns in input lines  ---
 !
@@ -2402,7 +2408,8 @@
         IF( (IRCKT(NRC).GE.10 .AND. IRCKT(NRC).LE.12) .OR. &
          (IRCKT(NRC).EQ.14 ) .OR. &
          (IRCKT(NRC).EQ.16 ) .OR. &
-         (IRCKT(NRC).GE.5 .AND. IRCKT(NRC).LE.9) ) THEN
+         (IRCKT(NRC).GE.5 .AND. IRCKT(NRC).LE.9) .OR. &
+         (IRCKT(NRC).EQ.120 ) ) THEN
 !
 !---      Identify the mineral species  ---
 !
@@ -2537,6 +2544,43 @@
               CALL RDDPR(ISTART,ICOMMA,CHDUM,RC_K(JCX+6,1,NRC))
             IF( ME.EQ. 0) WRITE(IWR,'(2X,2A,1PE11.4)') VARB(1:IVR), &
                 ': ',RC_K(JCX+6,1,NRC)
+            ENDIF
+          ENDIF
+!---      Read iex ph and time dependency parameters
+!         pH dependency  ---
+!
+          IF( IRCKT(NRC).EQ.120) THEN
+            VARB = 'Kinetic Reaction pH Dependency Parameter'
+            IDFLT = 1
+            INDX = JCX + 6 
+            IF( INDEX(CHDUM(ISTART:ISTART+5),'file') /= 0 ) THEN
+!----         five spots claimed for temperaturate dependency
+              INDX = JCX
+              T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
+              T_OK = RDIJK3D( T_FILENAME,LDXX,LO,HI,LNDX,INDX,LRCK,NRC,&
+                RC_K,VARX,ISBIN,ISHDF5 )
+              IRCKN(JCX)=1
+            ELSE
+              RC_K(INDX,1,NRC) = 0.D+0
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,RC_K(INDX,1,NRC))
+            IF( ME.EQ. 0) WRITE(IWR,'(2X,2A,1PE11.4)') VARB(1:IVR), &
+                ': ',RC_K(INDX,1,NRC)
+            ENDIF
+!           Simulation time dependency
+            VARB = 'Kinetic Reaction Simulation Time &
+                          Dependency Parameter'
+            IDFLT = 1
+            INDX = JCX + 7
+            IF( INDEX(CHDUM(ISTART:ISTART+5),'file') /= 0 ) THEN
+              T_OK = GETFILENAME( CHDUM,T_FILENAME,ISTART,ICOMMA,ISHDF5 )
+              T_OK = RDIJK3D( T_FILENAME,LDXX,LO,HI,LNDX,INDX,LRCK,NRC,&
+                RC_K,VARX,ISBIN,ISHDF5 )
+              IRCKN(INDX)=1
+            ELSE
+              RC_K(INDX,1,NRC) = 0.D+0
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,RC_K(INDX,1,NRC))
+              IF( ME.EQ. 0) WRITE(IWR,'(2X,2A,1PE11.4)') VARB(1:IVR), &
+                ': ',RC_K(INDX,1,NRC)
             ENDIF
           ENDIF
 !

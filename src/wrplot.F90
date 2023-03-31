@@ -319,6 +319,7 @@
 !   284	differential integrated oil or CH4 mass 'DMO'
 !   287 aqueous spill head/height m, 'HLSP'
 !   288 NAPL spill head/height m, 'HNSP'
+!   289 Evapotranspiration 'ET'
 !   401	solute volumetric concentration 'C   '
 !   402	solute aqueous concentration 'CL  '
 !   403	solute gas concentration 'CG  '
@@ -694,8 +695,10 @@
           CALL WRPL_16( FORM2,IPNV,IPNVGC )
         ELSEIF( IPNV.GT.256 .AND. IPNV.LE.272 ) THEN
           CALL WRPL_17( FORM2,IPNV,IPNVGC )
-        ELSEIF( IPNV.GT.273 .AND. IPNV.LE.288 ) THEN
+        ELSEIF( IPNV.GT.273 .AND. IPNV.LE.289 ) THEN
           CALL WRPL_18( FORM2,IPNV,IPNVGC )
+        ELSEIF( IPNV.GT.340 .AND. IPNV.LE.400 ) THEN ! Copied from wrplot.F90 in estomp33 - Bryan
+          CALL WRPL_20( FORM2,IPNV,IPNVGC )
         ENDIF
 !
 !---    Solute, conservation-component species, and
@@ -1734,7 +1737,7 @@
          varname = 'Gravimetric Moisture Content'
          varp_tmp = 0.d0
          do n=1,num_nodes
-              varp_tmp(n) =(SL(2,N)*PORD(2,N))/((RHOS(IZ(N))*(1-PORD(2,N)))/RHOL(2,N))
+              varp_tmp(n) =(SL(2,N)*PORD(2,N))/((RHOS(N))*(1-PORD(2,N)))/RHOL(2,N)
          enddo
          iflg = 0
          dflg = 1
@@ -4199,13 +4202,12 @@
 !----------------------Type Declarations-------------------------------!
 !
       CHARACTER*16 FORM
-      INTEGER LDIM, DIM1,DIM2,IDX,IFLG,DFLG
+      logical t_ok
+      integer idx,ldim, dim1,dim2, iflg, dflg
+      character*64 t_string
+      character*64 varname
+      LOGICAL :: use_ga
 
-
-
-
-      REAL(KIND=DP), DIMENSION(:), ALLOCATABLE ::  DVAR
-      LOGICAL::use_ga
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -4227,6 +4229,20 @@
       VAR = 1.D+0
       DIM1 = 0
       DIM2 = 0
+      IF( IPNV.EQ.289 ) THEN
+        INDX = 4
+        IUNM = 1
+        IUNS = -1
+        CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+        varname = 'Evapotranspiration'
+        iflg = 0
+        dflg = 1
+        ldim = 2
+        dim1 = 2
+        call string2idx(ldim,iflg,dflg,'et',idx,t_ok)
+        avar = 0.d0
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,ldim,dim1,dim2,var,avar,me,ipl,form,0)
+      ENDIF
 
       ICSN = ICSN-ICSNX
       SUBNM = SUBNM(1:ICSN)
@@ -4237,7 +4253,619 @@
       RETURN
       END
 
+!----------------------Subroutine--------------------------------------!
+!
+        SUBROUTINE WRPL_20( FORM,IPNV,IPNVGC )
+!
+!-------------------------Disclaimer-----------------------------------!
+!
+!     This material was prepared as an account of work sponsored by
+!     an agency of the United States Government. Neither the
+!     United States Government nor the United States Department of
+!     Energy, nor Battelle, nor any of their employees, makes any
+!     warranty, express or implied, or assumes any legal liability or
+!     responsibility for the accuracy, completeness, or usefulness
+!     of any information, apparatus, product, software or process
+!     disclosed, or represents that its use would not infringe
+!     privately owned rights.
+!
+!----------------------Acknowledgement---------------------------------!
+!
+!     This software and its documentation were produced with Government
+!     support under Contract Number DE-AC06-76RLO-1830 awarded by the
+!     United Department of Energy. The Government retains a paid-up
+!     non-exclusive, irrevocable worldwide license to reproduce,
+!     prepare derivative works, perform publicly and display publicly
+!     by or for the Government, including the right to distribute to
+!     other Government contractors.
+!
+!---------------------Copyright Notices--------------------------------!
+!
+!            Copyright Battelle Memorial Institute, 1996
+!                    All Rights Reserved.
+!
+!----------------------Description-------------------------------------!
+!
+!     Write plot files for the following variables:
+!
+!     341 aqueous internal energy, 'UL'
+!     342 gas internal energy, 'UG'
+!     343 nonaqueous liquid phase internal energy, 'UN'
+!     344 aqueous thermal conductivity, 'THKL'
+!     345 gas thermal conductivity, 'THKG'
+!     346 nonaqueous liquid phase thermal conductivity, 'THKN'
+!     347 CO2 aqueous diffusion coefficient, 'DFLA'
+!     348 H2O gas diffusion coefficient, 'DFGW'
+!     349       coupled-well CO2 mass rate, kg/s 'QMRA'
+!     350       coupled-well CO2 mass integral, kg 'QMIA'
+!     351       coupled-well water mass rate, kg/s 'QMRW'
+!     352 coupled-well water mass integral, kg 'QMIW'
+!     353 vertical-equilibrium gas-aqueous interface elevation, m, ZI_VE
+!     354 vertical-equilibrium gas pressure, Pa, PG_VE
+!     355 vertical-equilibrium aqueous pressure, Pa, PL_VE
+!     356 vertical-equilibrium gas saturation, SG_VE
+!     357 vertical-equilibrium trapped gas saturation, SGT_VE
+!     358 vertical-equilibrium aqueous saturation SL_VE
+!     359 vertical-equilibrium gas relative permeability, RKL_VE
+!     360 vertical-equilibrium aqueous relative permeability, RKG_VE
+!     361 vertically-integrated CO2 mass, kg, VIMA
+!     362 vertically-integrated CO2 mass, kg/m^2, VIAPA
+!     363 vertically-integrated CO2 mass, kg, VIGA
+!     364 vertically-integrated CO2 mass, kg/m^2, VIGAPA
+!     365 vertically-integrated CO2 mass, kg, VILA
+!     366 vertically-integrated CO2 mass, kg/m^2, VILAPA
+!     367 integrated precipitated salt mass, kg, IMPS
+!     368 mean effective stress, Pa, STRS-M
+!     369 x-direction normal strain, X-STRN
+!     370 y-direction normal strain, Y-STRN
+!     371 z-direction normal strain, Z-STRN
+!     372 x-direction displacement, m, X-DSPL
+!     373 y-direction displacement, m, Y-DSPL
+!     374 z-direction displacement, m, Z-DSPL
+!
+!----------------------Authors-----------------------------------------!
+!
+!     Written by MD White, PNNL, 22 December 2010.
+!
+!----------------------Fortran 90 Modules------------------------------!
+!
+          USE GLB_PAR
+          USE SOLTN
+          USE OUTPU
+          USE HYST
+          USE GRID
+          USE FILES
+         ! USE FDVT
+         ! USE FDVS
+          USE FDVP
+         ! USE FDVG
+          USE CONST
+          use grid_mod
 
+!
+!----------------------Implicit Double Precision-----------------------!
+!
+          IMPLICIT REAL*8 (A-H,O-Z)
+          IMPLICIT INTEGER (I-N)
+!
+!----------------------Include Statements------------------------------!
+!
+#include "mafdecls.fh"
+#include "global.fh"
+!
+!----------------------Parameter Statements----------------------------!
+!
+!
+!----------------------Type Declarations-------------------------------!
+!
+          CHARACTER*16 FORM
+          logical :: t_ok
+          integer dim, dim1,dim2,idx,iflg,dflg
+          double precision, dimension(:), allocatable :: dvar,dvar_tmp
+          character*64 varname
+
+!
+!----------------------Common Blocks-----------------------------------!
+!
+!
+!----------------------Executable Lines--------------------------------!
+!
+!          ISUB_LOG = ISUB_LOG+1
+!          SUB_LOG(ISUB_LOG) = '/WRPL_20'
+          IF( INDEX(CVS_ID(277)(1:1),'$').EQ.0 ) CVS_ID(277) = &
+           '$Id: wrplot.F,v 1.4 2011/09/09 17:15:38 d3c002 Exp $'
+        me = ga_nodeid()
+!
+!---  Dynamic memory allocation  ---
+!
+          ld_xy = ldx*ldy
+          ld_xymin = (ixmax-ixmin+1)*(iymax-iymin+1)
+                call ga_igop(1,ld_xy,1,'max')
+          allocate(dvar(ld_xy))
+          allocate(dvar_tmp(ld_xy))
+          VAR = 1.D+0
+!
+!---  Vertically-integrated CO2 mass  ---
+!
+          IF( IPNV.EQ.361 ) THEN
+            INDX = 4
+            IUNKG = 1
+            CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+            varname = 'Vertically-Integrated CO2 Mass'
+            dvar = 0.d0
+            varp_tmp = 0.d0
+            ijidx = 0
+            do icnx = 1,num_cnx
+                id_up = conn_up(icnx)
+                id_dn = conn_dn(icnx)
+                if(unvzc(icnx) == 1.d0) then
+                        if(izmin == 1.and.id_dn <= ldx*ldy) then
+                        varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)* &
+          (SL(2,id_dn)*RHOL(2,id_dn)*XLA(2,id_dn) + &
+           SG(2,id_dn)*RHOG(2,id_dn)*XGA(2,id_dn))
+        endif
+         if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+          (SL(2,id_up)*RHOL(2,id_up)*XLA(2,id_up) + &
+           SG(2,id_up)*RHOG(2,id_up)*XGA(2,id_up))
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+          if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+        if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+        mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+        if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+        enddo
+        call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+                mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+                if(me.eq.mx_tmp) then
+                        dvar = dvar_tmp
+                endif
+        enddo
+        dvar_tmp = 0.d0
+        enddo
+        enddo
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+                if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+      enddo
+      iflg = 0
+      dflg = 1
+      dim = 1
+      call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+      avar = 0.d0
+        !     call
+        !     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+!
+!---  Vertically-integrated CO2 mass per area  ---
+!
+          ELSEIF( IPNV.EQ.362 ) THEN
+            INDX = 4
+            IUNKG = 1
+            IUNM = -2
+            CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+            varname = 'Vertically-Integrated CO2 Mass per Area'
+            dvar = 0.d0
+            varp_tmp = 0.d0
+            ijidx = 0
+      do icnx = 1,num_cnx
+      id_up = conn_up(icnx)
+      id_dn = conn_dn(icnx)
+      if(unvzc(icnx) == 1.d0) then
+        if(izmin == 1.and.id_dn <= ldx*ldy) then
+          varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)*&
+          (SL(2,id_dn)*RHOL(2,id_dn)*XLA(2,id_dn) + &
+           SG(2,id_dn)*RHOG(2,id_dn)*XGA(2,id_dn))/areac(icnx)
+        endif
+         if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+          (SL(2,id_up)*RHOL(2,id_up)*XLA(2,id_up) + &
+           SG(2,id_up)*RHOG(2,id_up)*XGA(2,id_up))/areac(icnx)
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+          if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+      if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+                mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+        enddo
+     call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+                mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+        if(me.eq.mx_tmp) then
+                dvar = dvar_tmp
+        endif
+        enddo
+                 dvar_tmp = 0.d0
+        enddo
+        enddo
+!     call ga_dgop(1,dvar,ld_xy,'+')
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+       if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+        enddo
+        iflg = 0
+        dflg = 1
+        dim = 1
+        call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+        avar = 0.d0
+!     call
+!     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+!        DVAR(N) = DVAR(N) + VOL(NX)*PORD(2,NX)* &
+!          (SL(2,NX)*RHOL(2,NX)*XLA(2,NX) + &
+!           SG(2,NX)*RHOG(2,NX)*XGA(2,NX))
+!           SN(2,NX)*RHON(2,NX)*XNA(2,NX))/AFZ(NSZ(NX))
+!
+!---  Vertically-integrated gas CO2 mass  ---
+!
+         ELSEIF( IPNV.EQ.363 ) THEN
+           INDX = 4
+           IUNKG = 1
+           CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+           varname = 'Vertically-Integrated Gas CO2 Mass'
+           dvar = 0.d0
+           varp_tmp = 0.d0
+           ijidx = 0
+           do icnx = 1,num_cnx
+      id_up = conn_up(icnx)
+      id_dn = conn_dn(icnx)
+      if(unvzc(icnx) == 1.d0) then
+        if(izmin == 1.and.id_dn <= ldx*ldy) then
+          varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)*&
+           SG(2,id_dn)*RHOG(2,id_dn)*XGA(2,id_dn)
+        endif
+         if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+           SG(2,id_up)*RHOG(2,id_up)*XGA(2,id_up)
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+        if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+      if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+        enddo
+     call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+         dvar = dvar_tmp
+       endif
+        enddo
+         dvar_tmp = 0.d0
+        enddo
+        enddo
+!     call ga_dgop(1,dvar,ld_xy,'+')
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+       if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+        enddo
+        iflg = 0
+        dflg = 1
+        dim = 1
+        call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+        avar = 0.d0
+        !     call
+        !     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+!
+!---  Vertically-integrated gas CO2 mass per area  ---
+!
+          ELSEIF( IPNV.EQ.364 ) THEN
+            INDX = 4
+            IUNKG = 1
+            IUNM = -2
+            CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+         varname  = 'Vertically-Integrated Gas ' // 'CO2 Mass per Area'
+
+            dvar = 0.d0
+            varp_tmp = 0.d0
+            ijidx = 0
+            do icnx = 1,num_cnx
+      id_up = conn_up(icnx)
+      id_dn = conn_dn(icnx)
+      if(unvzc(icnx) == 1.d0) then
+        if(izmin == 1.and.id_dn <= ldx*ldy) then
+          varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)*&
+           SG(2,id_dn)*RHOG(2,id_dn)*XGA(2,id_dn)/areac(icnx)
+        endif
+         if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+           SG(2,id_up)*RHOG(2,id_up)*XGA(2,id_up)/areac(icnx)
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+          if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+      if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+                mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+        if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+       enddo
+        call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+         dvar = dvar_tmp
+       endif
+        enddo
+         dvar_tmp = 0.d0
+        enddo
+        enddo
+!     call ga_dgop(1,dvar,ld_xy,'+')
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+       if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+        enddo
+        iflg = 0
+        dflg = 1
+        dim = 1
+        call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+        avar = 0.d0
+!     call
+!     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+!
+!---  Vertically-integrated aqueous CO2 mass  ---
+!
+          ELSEIF( IPNV.EQ.365 ) THEN
+            INDX = 4
+            IUNKG = 1
+            CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+            varname = 'Vertically-Integrated Aqueous CO2 Mass'
+            dvar = 0.d0
+            varp_tmp = 0.d0
+            ijidx = 0
+            do icnx = 1,num_cnx
+      id_up = conn_up(icnx)
+      id_dn = conn_dn(icnx)
+      if(unvzc(icnx) == 1.d0) then
+        if(izmin == 1.and.id_dn <= ldx*ldy) then
+          varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)*&
+           SL(2,id_dn)*RHOL(2,id_dn)*XLA(2,id_dn)
+        endif
+        if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+           SL(2,id_up)*RHOL(2,id_up)*XLA(2,id_up)
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+          if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+      if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+        enddo
+     call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+         dvar = dvar_tmp
+       endif
+        enddo
+         dvar_tmp = 0.d0
+        enddo
+        enddo
+!     call ga_dgop(1,dvar,ld_xy,'+')
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+       if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+        enddo
+        iflg = 0
+        dflg = 1
+        dim = 1
+        call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+        avar = 0.d0
+!     call
+!     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+!
+!---  Vertically-integrated aqueous CO2 mass per area  ---
+!
+          ELSEIF( IPNV.EQ.366 ) THEN
+            INDX = 4
+            IUNKG = 1
+            IUNM = -2
+            CALL RDUNIT(UNPLOT(IPNV),VAR,INDX)
+            varname = 'Vertically-Integrated Aqueous ' //   &
+      'CO2 Mass per Area'
+            dvar = 0.d0
+            varp_tmp = 0.d0
+            ijidx = 0
+      do icnx = 1,num_cnx
+      id_up = conn_up(icnx)
+      id_dn = conn_dn(icnx)
+      if(unvzc(icnx) == 1.d0) then
+        if(izmin == 1.and.id_dn <= ldx*ldy) then
+          varp_tmp(id_dn) = varp_tmp(id_dn) + VOL(id_dn)*PORD(2,id_dn)*&
+           SL(2,id_dn)*RHOL(2,id_dn)*XLA(2,id_dn)/areac(icnx)
+        endif
+         if( id_g2l(id_up) > 0 )then
+          varp_tmp(id_up) = varp_tmp(id_dn) + VOL(id_up)*PORD(2,id_up)*&
+           SL(2,id_up)*RHOL(2,id_up)*XLA(2,id_up)/areac(icnx)
+          if(id_up > ldx*ldy*(ldz-1) .and. izmax == nzdim) then
+            ijidx = ijidx+1
+            dvar(ijidx) = varp_tmp(id_up)
+          endif
+         else
+        if(id_g2l(id_dn) <= 0) cycle
+           ijidx = ijidx+1
+           dvar(ijidx) = varp_tmp(id_dn)
+         endif
+!        endif
+      endif
+      enddo
+      if(ga_pz > 1) then
+        nga_xy = ga_px*ga_py
+        dvar_tmp = 0.d0
+        do lpy = 1,ga_py
+        do lpx = 1,ga_px
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+          dvar_tmp = dvar
+       endif
+        enddo
+     call ga_dgop(1,dvar_tmp,ld_xy,'+')
+        do lpz = 1,ga_pz
+       mx_tmp = lpx-1+(lpy-1)*ga_px+(lpz-1)*nga_xy
+       if(me.eq.mx_tmp) then
+         dvar = dvar_tmp
+       endif
+        enddo
+         dvar_tmp = 0.d0
+        enddo
+        enddo
+!     call ga_dgop(1,dvar,ld_xy,'+')
+        endif
+        varp_tmp = 0.d0
+        ijidx = 0
+        do i=1,num_nodes
+       if(id_g2l(i) > 0) then
+        ijidx = ijidx + 1
+        if(ijidx > ld_xymin) then
+          ijidx = 1
+        endif
+        varp_tmp(i) = dvar(ijidx)
+       endif
+        enddo
+        iflg = 0
+        dflg = 1
+     dim = 1
+     call string2idx(dim,iflg,dflg,'varp_tmp',idx,t_ok)
+        avar = 0.d0
+!     call
+!     get_data_from_ga(form,iflg,dflg,dim,dim1,dim2,idx,ipl,0,var,avar)
+!     call ga_sync
+        call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,dim,dim1,dim2,var,avar,me,ipl,form2,0)
+        ENDIF
+        deallocate(dvar)
+        deallocate(dvar_tmp)
+!  ISUB_LOG = ISUB_LOG-1
+!
+!---  End of WRPL_20 group
+        RETURN
+    END
 
       subroutine string2idx(ldim,iflg,dflg,t_string,idx,t_ok)
   use grid_mod

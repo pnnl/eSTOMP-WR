@@ -1,6 +1,6 @@
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE JCBWL
+      SUBROUTINE JCBWL(petsc_A)
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -57,6 +57,8 @@
       USE FDVP
       use grid_mod
       use petscapp
+      USE COUP_WELL
+      use plt_atm
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -138,17 +140,35 @@
         enddo
         do m = 1,isvc
           accum_res(m,n) = stwx(m+1) - srcw(m+2,n) - stwx(1) + srcw(2,n)
+          if(lplant == 1) then
+            accum_res(m,n) = accum_res(m,n) - veg_sink(m+2,n) + veg_sink(2,n)
+          endif
         END DO
 !       right hand side
         residual(ieqw,n) = stwx(1) - srcw(2,n)
-
+        if(lplant == 1) then
+          residual(ieqw,n) = residual(ieqw,n) - veg_sink(2,n)
+        endif
         nc = isvc
         nr = isvc
+!**********************coupled well - Bryan*************************
+        if(l_cw == 1) then
+          nax = ixp(n)
+          n_locx = nax-1
+          incx = loc_map(n)-nax
+        else
+          n_locx = loc_map(n)-1
+          incx = 0
+        endif
+        ir(1) = incx+n_locx*luk+ieqw-1
         do m=1,isvc
-          icol = (loc_map(n)-1)*luk+m-1
-!          icol = (n-1)*luk+m-1
+          icol = incx+n_locx*luk+m-1
+!          icol = (loc_map(n)-1)*luk+m-1
+!!          icol = (n-1)*luk+m-1
           ic(m) = icol
-          ir(m) = icol
+!          ir(m) = icol     ! should it comment out?-Since m=ieqw=1, it doesn't
+!          matter.
+!*******************************************************************        
           accum_deriv(m,n) = accum_res(m,n)/dnr(m,n)
         enddo
         values_(1:isvc) = accum_deriv(1:isvc,n)
@@ -186,25 +206,58 @@
 
 !to load into petsc
   nc = 2*isvc
-  nr = nr
+!  nr = nr
+  nr = 2  ! nr  one for field and one for coupled wells
   ic = 0
   ir = 0
   do i=1,num_cnx
     id_up = conn_up(i)
     id_dn = conn_dn(i)
     if(ixp(id_up) <= 0 .or. ixp(id_dn) <= 0) cycle
-    do m=1,isvc
-     flux_deriv(1,id_dn) = (flux_res(2*m,i) - flux_res(1,i))/dnr(m,id_dn)
-     flux_deriv(2,id_dn) = (flux_res(2*m+1,i) - flux_res(1,i))/dnr(m,id_up)
-     flux_deriv(1,id_up) = -flux_deriv(1,id_dn)
-     flux_deriv(2,id_up) = -flux_deriv(2,id_dn)
-     nr = 2
-     nc = 2
-     irowdx = (loc_map(id_dn)-1)*luk+m-1
-     irowux = (loc_map(id_up)-1)*luk+m-1
-!print *,'n--map me',me,id_dn,loc_map(id_dn),id_up,loc_map(id_up)
-!     irowdx = ((id_dn)-1)*luk+m-1
-!     irowux = ((id_up)-1)*luk+m-1
+    ! ******** Couple well *****************
+    isvc2 = 2*isvc
+    m = ieqw
+    if(l_cw == 1) then
+      id_dn_ax = ixp(id_dn)
+      id_up_ax = ixp(id_up)
+      n_locx_dn = id_dn_ax-1
+      incx_dn = loc_map(id_dn)-id_dn_ax
+      n_locx_up = id_up_ax-1
+      incx_up = loc_map(id_up)-id_up_ax
+    else
+      n_locx_dn = loc_map(id_dn)-1
+      incx_dn = 0
+      n_locx_up = loc_map(id_up)-1
+      incx_up = 0
+    endif
+    irowdx = incx_dn+n_locx_dn*luk+m-1
+    irowux = incx_up+n_locx_up*luk+m-1
+    ir(1) = irowdx
+    ir(2) = irowux
+    !***********************************************
+    do n=1,isvc
+     irowdx = incx_dn+n_locx_dn*luk+n-1
+     irowux = incx_up+n_locx_up*luk+n-1
+     n1 = n
+     n2 = isvc+n
+     ic(n1) = irowdx
+     ic(n2) = irowux
+     flux_deriv(n1,id_dn) = (flux_res(2*n,i) - flux_res(1,i))/dnr(n,id_dn)
+     flux_deriv(n2,id_dn) = (flux_res(2*n+1,i) - flux_res(1,i))/dnr(n,id_up)
+     flux_deriv(n1,id_up) = -flux_deriv(n1,id_dn)
+     flux_deriv(n2,id_up) = -flux_deriv(n2,id_dn)
+!    do m=1,isvc
+!     flux_deriv(1,id_dn) = (flux_res(2*m,i) - flux_res(1,i))/dnr(m,id_dn)
+!     flux_deriv(2,id_dn) = (flux_res(2*m+1,i) - flux_res(1,i))/dnr(m,id_up)
+!     flux_deriv(1,id_up) = -flux_deriv(1,id_dn)
+!     flux_deriv(2,id_up) = -flux_deriv(2,id_dn)
+!     nr = 2
+!     nc = 2
+!     irowdx = (loc_map(id_dn)-1)*luk+m-1
+!     irowux = (loc_map(id_up)-1)*luk+m-1
+!!print *,'n--map me',me,id_dn,loc_map(id_dn),id_up,loc_map(id_up)
+!!     irowdx = ((id_dn)-1)*luk+m-1
+!!     irowux = ((id_up)-1)*luk+m-1
      ir(1) = irowdx
      ir(2) = irowux
      ic(1) = irowdx

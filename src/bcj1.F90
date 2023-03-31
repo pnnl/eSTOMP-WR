@@ -2,7 +2,7 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE BCJ1
+      SUBROUTINE BCJ1(petsc_A)
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -97,7 +97,7 @@
 !---  Aqueous  ---
 !
         IF( IBCT(IEQW,NB).NE.3 ) THEN
-          CALL JCBWLB( N,NB )
+          CALL JCBWLB( N,NB,petsc_A ) !2 matrix-BH
         ENDIF
   100 CONTINUE
       ICSN = ICSN-ICSNX
@@ -110,7 +110,7 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE JCBWLB( N,NB )
+      SUBROUTINE JCBWLB( N,NB,petsc_A )
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -165,6 +165,7 @@
       use bcv
       use grid_mod
       use petscapp
+      USE COUP_WELL  ! for couped well - BH
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -235,26 +236,57 @@
         signx = sign(1,ibcd(nb))
         RS(M) = signx*areab(nb)*q_flux_b(mp,nb)*FLW
   100 CONTINUE
+
 !
 !---  Load Jacobian Matrix  ---
 !
-      nr = isvc
+      nr = 1
       nc = isvc
+      if(l_cw == 1) then
+        nax = ixp(n)
+        n_locx = nax-1
+        incx = loc_map(n)-nax
+      else
+        n_locx = loc_map(n)-1
+        incx = 0
+      endif
+
+      icol = incx+n_locx*luk+ieqw-1
+      ir(1) = icol
       do m=1,isvc
-       icol = (loc_map(n)-1)*luk+m-1
-!       icol = ((n)-1)*luk+m-1
+       icol = incx+n_locx*luk+m-1
        ic(m) = icol
-       ir(m) = icol
        values_(m) = (rs(m+1)-rs(1))/dnr(m,n)
+!print *,'goto
+!jcbwl-',values_(:),ir,'m',m,ic(m),rs(m+1),rs(1),'luk=',luk
       enddo
-!print *,'ir--ic',ir,ic,'nb',values_(1),ibct(1,nb)
-      call MatSetValuesLocal( petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr )
+      call MatSetValuesLocal(petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr)
 !
 !--- Set RHS
 !
       residual(ieqw,n) = residual(ieqw,n) + rs(1)
-!print *,'residual-----------bc',me,n,residual(ieqw,n),nb,ibct(1,nb),rs(1)
+!print
+!*,'residual-----------bc',me,n,residual(ieqw,n),nb,ibct(1,nb),rs(1)  
 !
+!---  Load Jacobian Matrix  ---
+!
+!      nr = isvc
+!      nc = isvc
+!      do m=1,isvc
+!       icol = (loc_map(n)-1)*luk+m-1
+!!       icol = ((n)-1)*luk+m-1
+!       ic(m) = icol
+!       ir(m) = icol
+!       values_(m) = (rs(m+1)-rs(1))/dnr(m,n)
+!      enddo
+!!print *,'ir--ic',ir,ic,'nb',values_(1),ibct(1,nb)
+!      call MatSetValuesLocal( petsc_A,nr,ir,nc,ic,values_,ADD_VALUES,ierr )
+!!
+!!--- Set RHS
+!!
+!      residual(ieqw,n) = residual(ieqw,n) + rs(1)
+!!print *,'residual-----------bc',me,n,residual(ieqw,n),nb,ibct(1,nb),rs(1)
+!!
       ICSN = ICSN-ICSNX
       SUBNM = SUBNM(1:ICSN)
 !

@@ -70,6 +70,7 @@
       USE CONST
       use grid_mod
       use outpu
+      USE coup_well
 !  use sidl
 !  use sidl_NotImplementedException
 !  use sidl_BaseInterface
@@ -191,6 +192,15 @@ end interface
 !  unvyc => t_rvec%d_data
   call get_cnx_dfield('z_separation',unvzc,t_ok)
 !  unvzc => t_rvec%d_data
+!Gravity -BH
+   call get_node_dfield('grvpx',grvpx,t_ok)
+   call get_node_dfield('grvpy',grvpy,t_ok)
+   call get_node_dfield('grvpz',grvpz,t_ok)
+   if(ics/=8) then
+     grvpx = 0.d0
+     grvpy = 0.d0
+     grvpz = 9.81d0
+   endif
 !
 !---  [ BCV, BCVP, BCVT, BCVG, BCVN, BCVI, BCVS, BCVA ]
 !     Boundary condition variables  ---
@@ -1333,7 +1343,7 @@ end interface
 !      USE FDVN
 !      USE FDVH
 !      USE FDVA
-!
+      USE COUP_WELL
 
 !----------------------Implicit Double Precision-----------------------!
 !
@@ -1429,6 +1439,8 @@ end interface
       allocate(irefgc(loupv))
       allocate(chref(loupv))
       allocate(chsf(loupv,3))
+      allocate(iref_cw(loupv)) ! for coupled well - BH
+        iref_cw = 0
       DO 50 L = 1,LOUPV
         UNPLOT(L) = 'null'
         UNREF(L) = 'null'
@@ -2080,6 +2092,9 @@ end interface
       CHREF(288) = 'HNSP'
       UNREF(288) = 'm'
       UNPLOT(288) = 'm'
+      CHREF(289) = 'ET'
+      UNREF(289) = 'm/s'
+      UNPLOT(289) = 'm/s'
       CHSF(1,1) = ' UQV'
       CHSF(1,2) = ' VQV'
       CHSF(1,3) = ' WQV'

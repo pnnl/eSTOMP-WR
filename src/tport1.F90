@@ -2,7 +2,8 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE TPORT1( NSL )
+!      SUBROUTINE TPORT1( NSL )
+      SUBROUTINE TPORT1( NSL,petsc_ksp,petsc_a,petsc_b,petsc_x,petsc_pc)
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -51,6 +52,7 @@
       use trnspt
       use files
       use fdvp
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -89,7 +91,10 @@
 !
 !---  Compute solute sources ---
 !
-      CALL SORT1( NSL )
+      IF( L_CW.EQ.1 ) THEN
+          CALL SOLUT_COUP_WELL(NSL,petsc_A)
+      ENDIF
+      CALL SORT1( NSL, petsc_A )
 !
 !---  Zero solute transport fluxes  ---
 !
@@ -97,15 +102,17 @@
 !
 !---  Load Jacobian matrix ---
 !
-      CALL SJCBL( NSL )
+      CALL SJCBL( NSL, petsc_A )
 !
 !---  Modify Jacobian matrix for boundary conditions ---
 !
-      CALL SBND1( NSL )
+      CALL SBND1( NSL, petsc_A )
       residual=-1.d0*residual
       icnv = 3
       iter = -1
-      call petsc_solver_solve(icnv,iter,nstep)
+!      call petsc_solver_solve(icnv,iter,nstep)
+      call petsc_solver_solve(1,icnv,iter,nstep,&
+                petsc_ksp,petsc_a,petsc_b,petsc_x,petsc_pc)
       IF( icnv == 1 .and. me.eq.0) THEN
         WRITE(ISC,'(4X,A)') &
           '( Solution for Transport Equation is not convergent )'
@@ -129,6 +136,9 @@
 !
 !---  Integrate solute sources  ---
 !
+     IF( L_CW.EQ.1 ) THEN
+                CALL SOLUIT_COUP_WELL(NSL)
+     ENDIF
      CALL SORIT1( NSL )
 !
       ICSN = ICSN-ICSNX

@@ -75,7 +75,7 @@
 !
 !----------------------Type Declarations-------------------------------!
 !
-      CHARACTER*64 ADUM,BDUM,UNTS
+      CHARACTER*64 ADUM,BDUM,UNTS,FDUM,TMP
       CHARACTER*512 CHDUM
       REAL*8 VAR(LSTM,8+LSOLU)
   integer :: g_buf,three,idx
@@ -86,6 +86,10 @@
   integer :: lo(3),hi(3),ldim(3),dims(3)
   logical :: status, t_ok
   LOGICAL :: use_ga
+  integer, dimension(:,:), allocatable :: temp_ijk  
+  INTEGER, ALLOCATABLE :: VAL_BUF(:)
+  INTEGER, ALLOCATABLE :: IDX_BUF(:,:)
+  INTEGER ::I_SC, I_TMP,J_TMP,K_TMP
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -270,60 +274,123 @@
 !
 !---  Read source domain indices  ---
 !
-        VARB = 'Source Domain Index'
-        ISX = ISTART
-        CALL RDINT(ISTART,ICOMMA,CHDUM,IS)
-        CALL RDINT(ISTART,ICOMMA,CHDUM,IE)
-        CALL RDINT(ISTART,ICOMMA,CHDUM,JS)
-        CALL RDINT(ISTART,ICOMMA,CHDUM,JE)
-        CALL RDINT(ISTART,ICOMMA,CHDUM,KS)
-        CALL RDINT(ISTART,ICOMMA,CHDUM,KE)
-        IS = MAX( 1,IS )
-        IS = MIN( IS,IE,nxdim )
-        IE = MAX( 1,IS,IE )
-        IE = MIN( IE,nxdim )
-        JS = MAX( 1,JS )
-        JS = MIN( JS,JE,nydim )
-        JE = MAX( 1,JS,JE )
-        JE = MIN( JE,nydim )
-        KS = MAX( 1,KS )
-        KS = MIN( KS,KE,nzdim )
-        KE = MAX( 1,KS,KE )
-        KE = MIN( KE,nzdim )
+        I_TMP = ISTART
+        CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,TMP)
+        IF( INDEX(TMP,'file').EQ.0 ) THEN
+          VARB = 'Source Domain Index'
+          ISTART = I_TMP
+          ISX = ISTART
+          CALL RDINT(ISTART,ICOMMA,CHDUM,IS)
+          CALL RDINT(ISTART,ICOMMA,CHDUM,IE)
+          CALL RDINT(ISTART,ICOMMA,CHDUM,JS)
+          CALL RDINT(ISTART,ICOMMA,CHDUM,JE)
+          CALL RDINT(ISTART,ICOMMA,CHDUM,KS)
+          CALL RDINT(ISTART,ICOMMA,CHDUM,KE)
+          IS = MAX( 1,IS )
+          IS = MIN( IS,IE,nxdim )
+          IE = MAX( 1,IS,IE )
+          IE = MIN( IE,nxdim )
+          JS = MAX( 1,JS )
+          JS = MIN( JS,JE,nydim )
+          JE = MAX( 1,JS,JE )
+          JE = MIN( JE,nydim )
+          KS = MAX( 1,KS )
+          KS = MIN( KS,KE,nzdim )
+          KE = MAX( 1,KS,KE )
+          KE = MIN( KE,nzdim )
 
-        ICX = ISTART
-        if(me.eq.0) write(IWR,'(/,2X,A)') 'Source Domain:'
-        if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'I = ',IS,' to ',IE
-        if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'J = ',JS,' to ',JE
-        if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'K = ',KS,' to ',KE
+          ICX = ISTART
+          if(me.eq.0) write(IWR,'(/,2X,A)') 'Source Domain:'
+          if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'I = ',IS,' to ',IE
+          if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'J = ',JS,' to ',JE
+          if(me.eq.0) write(IWR,'(4X,A,I6,A,I6)') 'K = ',KS,' to ',KE
 !
 !---  Check for ill-defined source domains  ---
 !
-        IF( IS.LT.1 .OR. IS.GT.nxdim .OR. IE.LT.1 .OR. &
-        IE.GT.nxdim .OR. IE.LT.IS ) THEN
-          INDX = 4
-          CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-          CALL WRMSGS( INDX )
+          IF( IS.LT.1 .OR. IS.GT.nxdim .OR. IE.LT.1 .OR. &
+            IE.GT.nxdim .OR. IE.LT.IS ) THEN
+            INDX = 4
+            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+            CALL WRMSGS( INDX )
+          ENDIF
+          IF( JS.LT.1 .OR. JS.GT.nydim .OR. JE.LT.1 .OR. &
+            JE.GT.nydim .OR. JE.LT.JS ) THEN
+            INDX = 4
+            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+            CALL WRMSGS( INDX )
+          ENDIF
+          IF( KS.LT.1 .OR. KS.GT.nzdim .OR. KE.LT.1 .OR. &
+            KE.GT.nzdim .OR. KE.LT.KS ) THEN
+            INDX = 4
+            CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
+            CALL WRMSGS( INDX )
+          ENDIF
+ 
+          lo(1) = is
+          lo(2) = js
+          lo(3) = ks
+          hi(1) = ie
+          hi(2) = je
+          hi(3) = ke
+          call nga_fill_patch(g_buf,lo,hi,1)
+        ELSE 
+        ! read external file to define source domain
+          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+          NCH = INDEX(FDUM,'  ')-1
+          IF (ME==0) THEN
+            T_OK = OPENFILE( FDUM(1:NCH),IUNIT,0 )
+          ENDIF
+          NTOTAL = IFLD*JFLD*KFLD
+          ALLOCATE(TEMP_IJK(NTOTAL,3))
+          TEMP_IJK = 0
+          IS = 1
+          IE = 1
+          JS = 1
+          JE = 1
+          KS = 1
+          KE = 0
+          T_OK = RD_SPARSE_IJK(FDUM(1:NCH),TEMP_IJK(1,1),NTOTAL,3,KE)
+          call ga_igop(28,ke,1,'max')
+          ! fill the source cells in g_buf with 1
+          CALL GA_FILL(G_BUF,0)
+          ALLOCATE(IDX_BUF(3,KE))
+          ALLOCATE(VAL_BUF(KE))
+          VAL_BUF = 1
+          DO I_SC = 1, KE
+            I_TMP = TEMP_IJK(I_SC,1)
+            J_TMP = TEMP_IJK(I_SC,2)
+            K_TMP = TEMP_IJK(I_SC,3)
+            IF( I_TMP.LT.1 .OR. I_TMP.GT.NXDIM .OR. J_TMP.LT.1 .OR. &
+                J_TMP.GT.NYDIM .OR. K_TMP.LT.1 .OR. K_TMP.GT.NZDIM ) THEN
+              INDX = 4
+              CHMSG = 'Source Node Index Out of Range'
+              CALL WRMSGS(INDX)
+            ENDIF
+            IDX_BUF(1,I_SC) = I_TMP
+            IDX_BUF(2,I_SC) = J_TMP
+            IDX_BUF(3,I_SC) = K_TMP
+            if(me.eq.0) then
+              if (I_SC.eq.1) then
+                WRITE(IWR,'(A)') 'Source cells are defined at:'
+                WRITE(IWR,'(8X,3I)') IDX_BUF(1:3,I_SC)
+              else
+                WRITE(IWR,'(8X,3I)') IDX_BUF(1:3,I_SC)
+              endif
+            endif             
+          ENDDO
+          DEALLOCATE(TEMP_IJK)
+          CALL NGA_SCATTER(G_BUF,VAL_BUF(1),IDX_BUF(1,1),KE)
+          DEALLOCATE(IDX_BUF)
+          DEALLOCATE(VAL_BUF) 
         ENDIF
-        IF( JS.LT.1 .OR. JS.GT.nydim .OR. JE.LT.1 .OR. &
-        JE.GT.nydim .OR. JE.LT.JS ) THEN
-          INDX = 4
-          CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-          CALL WRMSGS( INDX )
-        ENDIF
-        IF( KS.LT.1 .OR. KS.GT.nzdim .OR. KE.LT.1 .OR. &
-        KE.GT.nzdim .OR. KE.LT.KS ) THEN
-          INDX = 4
-          CHMSG = 'Invalid Source Domain: ' // CHDUM(ISX:ICX)
-          CALL WRMSGS( INDX )
-        ENDIF
-        lo(1) = is
-        lo(2) = js
-        lo(3) = ks
-        hi(1) = ie
-        hi(2) = je
-        hi(3) = ke
-        call nga_fill_patch(g_buf,lo,hi,1)
+
+!        lo(1) = is
+!        lo(2) = js
+!        lo(3) = ks
+!        hi(1) = ie
+!        hi(2) = je
+!        hi(3) = ke
+!        call nga_fill_patch(g_buf,lo,hi,1)
         lo(1) = iaxmin
         lo(2) = iaymin
         lo(3) = iazmin
@@ -574,332 +641,375 @@
           T_OK = BUFFEREDREAD_GETLINE(CHDUM)
           CALL LCASE( CHDUM )
           ISTART = 1
-          VARB = 'Source Time'
-          CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,1))
-          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-          if(me.eq.0) write(IWR,'(/,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-          ': ',VAR(NTM,1)
-          INDX = 0
-          IUNS = 1
-          CALL RDUNIT(UNTS,VAR(NTM,1),INDX)
-          if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,1),', s)'
-          IF( ISRTX.EQ.3 ) THEN
-            VARB = 'Source Aqueous Volumetric Density Rate'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,TMP)
+          if (INDEX(TMP(1:),'file').NE.0) then
+            IF( ISRTX.EQ.3 ) THEN 
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              NCH = INDEX(FDUM,'  ')-1
+              T_OK = OPENFILE( FDUM(1:NCH),IUNIT,0 )
+              ! loop through each line of the external file
+              DO ILINE = 1,ISRM(NS)
+                READ(IUNIT,'(4A)') CHDUM
+                CALL LCASE( CHDUM )
+                VARB = 'Source Time'
+                ISTART = 1
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(ILINE,1))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) write(IWR,'(/,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+                ': ',VAR(ILINE,1)
+                INDX = 0
+                IUNS = 1
+                CALL RDUNIT(UNTS,VAR(ILINE,1),INDX)
+                if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(ILINE,1),', s)'
+                VARB = 'Source Aqueous Volumetric Density Rate'
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(ILINE,4))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+                ': ',VAR(ILINE,4)
+                INDX = 0
+                IUNS = -1
+                CALL RDUNIT(UNTS,VAR(ILINE,4),INDX)
+                if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(ILINE,4),', 1/s)'
+              ENDDO
+              GO TO 110
+            ELSE
+              IF (ME.EQ.0) THEN
+                WRITE(IWR,*) "ERROR: Read external source data file is only available "
+                WRITE(IWR,*) "       for Aqueous Volumetric Density Rate. "
+                WRITE(ISC,*) "ERROR: Read external source data file is only available"
+                WRITE(ISC,*) "       for Aqueous Volumetric Density Rate. "
+              ENDIF
+              STOP
+            ENDIF
+          else 
+            ISTART = 1 
+            VARB = 'Source Time'
+            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,1))
             CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
+            if(me.eq.0) write(IWR,'(/,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+            ': ',VAR(NTM,1)
             INDX = 0
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/s)'
-          ELSEIF( ISRTX.EQ.2 ) THEN
-            VARB = 'Source Aqueous Volumetric Rate'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = 3
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m^3/s)'
-          ELSEIF( ISRTX.EQ.4 ) THEN
-            VARB = 'Source Aqueous Mass Rate'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNKG = 1
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', kg/s)'
-          ELSEIF( ISRTX.EQ.5 ) THEN
-            VARB = 'Source Aqueous Mass Density Rate'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNKG = 1
-            IUNM = -3
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', kg/m^3 s)'
+            IUNS = 1
+            CALL RDUNIT(UNTS,VAR(NTM,1),INDX)
+            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,1),', s)'
+            IF( ISRTX.EQ.3 ) THEN
+              VARB = 'Source Aqueous Volumetric Density Rate'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/s)'
+            ELSEIF( ISRTX.EQ.2 ) THEN
+              VARB = 'Source Aqueous Volumetric Rate'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = 3
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m^3/s)'
+            ELSEIF( ISRTX.EQ.4 ) THEN
+              VARB = 'Source Aqueous Mass Rate'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNKG = 1
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', kg/s)'
+            ELSEIF( ISRTX.EQ.5 ) THEN
+              VARB = 'Source Aqueous Mass Density Rate'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNKG = 1
+              IUNM = -3
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', kg/m^3 s)'
 !
 !---      Injection Well Source  ---
 !
-          ELSEIF( ISRTX.GE.31 .AND. ISRTX.LE.33 ) THEN
-            VARB = 'Well Pressure'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ', &
-            UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VARB = 'Well Diameter'
-            IDFLT = 1
-            VAR(NTM,3) = 1.7D-1
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,3)
-            INDX = 0
-            IUNM = 1
-            CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', m)'
-            VARB = 'Symmetry Factor'
-            IDFLT = 1
-            VAR(NTM,4) = 1.D+0
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            if(me.eq.0) write(IWR,'(2X,2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,4)
+            ELSEIF( ISRTX.GE.31 .AND. ISRTX.LE.33 ) THEN
+              VARB = 'Well Pressure'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ', &
+              UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VARB = 'Well Diameter'
+              IDFLT = 1
+              VAR(NTM,3) = 1.7D-1
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,3)
+              INDX = 0
+              IUNM = 1
+              CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', m)'
+              VARB = 'Symmetry Factor'
+              IDFLT = 1
+              VAR(NTM,4) = 1.D+0
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              if(me.eq.0) write(IWR,'(2X,2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,4)
 !
 !---        Convert minimum well pressure to guage and well diameter
 !           to well radius  ---
 !
-            VAR(NTM,2) = VAR(NTM,2)-PATM
-            VAR(NTM,3) = 5.D-1*VAR(NTM,3)
-          ELSEIF( ISRTX.LT.0 .AND. ISRTX.GE.-NSOLU ) THEN
-            VARB = 'Source Solute Rate: '
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/s)'
-          ELSEIF( ISRTX.LT.-NSOLU .AND. ISRTX.GE.-2*NSOLU ) THEN
-            VARB = 'Solute Density Rate'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNS = -1
-            IUNM = -3
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3 s)'
-          ELSEIF( ISRTX.LT.-2*NSOLU .AND. ISRTX.GE.-3*NSOLU ) THEN
-            VARB = 'Source Exhaust Gas Temperature'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,6))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,6)
-            INDX = 0
-            IUNK = 1
-            CALL RDUNIT(UNTS,VAR(NTM,6),INDX)
-            VARB = 'Source Exhaust Gas Pressure'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            CALL WATSP( VAR(NTM,6),PSWX )
-            IF( VAR(NTM,2).LT.PSWX ) THEN
-              INDX = 4
-              CHMSG = 'Exhaust Gas Pressure < Sat. Water Vapor Pres.'
-              CALL WRMSGS( INDX )
-            ENDIF
-            VARB = 'Source Air/Water Volumetric Flow Ratio'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Air/Water Partition Coefficient (Henry''s Const.)'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', Pa)'
-            VAR(NTM,5) = VOLX
-            IDFLT = 1
-            VAR(NTM,7) = 1.D+0
-            VARB = 'Source Vapor Stripping Efficiency'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,7))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,7)
-            IF( VAR(NTM,7).GT.1.D+0 ) &
-            VAR(NTM,7)=MAX(VAR(NTM,7)/1.D+2,1.D+0)
-          ELSEIF( ISRTX.LT.-3*NSOLU .AND. ISRTX.GE.-4*NSOLU ) THEN
-            VARB = 'Domain Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Solute Aqueous Concentration'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = -3
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3)'
-            VAR(NTM,5) = -1.D+0
+              VAR(NTM,2) = VAR(NTM,2)-PATM
+              VAR(NTM,3) = 5.D-1*VAR(NTM,3)
+            ELSEIF( ISRTX.LT.0 .AND. ISRTX.GE.-NSOLU ) THEN
+              VARB = 'Source Solute Rate: '
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/s)'
+            ELSEIF( ISRTX.LT.-NSOLU .AND. ISRTX.GE.-2*NSOLU ) THEN
+              VARB = 'Solute Density Rate'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNS = -1
+              IUNM = -3
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3 s)'
+            ELSEIF( ISRTX.LT.-2*NSOLU .AND. ISRTX.GE.-3*NSOLU ) THEN
+              VARB = 'Source Exhaust Gas Temperature'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,6))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,6)
+              INDX = 0
+              IUNK = 1
+              CALL RDUNIT(UNTS,VAR(NTM,6),INDX)
+              VARB = 'Source Exhaust Gas Pressure'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              CALL WATSP( VAR(NTM,6),PSWX )
+              IF( VAR(NTM,2).LT.PSWX ) THEN
+                INDX = 4
+                CHMSG = 'Exhaust Gas Pressure < Sat. Water Vapor Pres.'
+                CALL WRMSGS( INDX )
+              ENDIF
+              VARB = 'Source Air/Water Volumetric Flow Ratio'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Air/Water Partition Coefficient (Henry''s Const.)'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', Pa)'
+              VAR(NTM,5) = VOLX
+              IDFLT = 1
+              VAR(NTM,7) = 1.D+0
+              VARB = 'Source Vapor Stripping Efficiency'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,7))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4)') VARB(1:IVR),': ',VAR(NTM,7)
+              IF( VAR(NTM,7).GT.1.D+0 ) &
+              VAR(NTM,7)=MAX(VAR(NTM,7)/1.D+2,1.D+0)
+            ELSEIF( ISRTX.LT.-3*NSOLU .AND. ISRTX.GE.-4*NSOLU ) THEN
+              VARB = 'Domain Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Solute Aqueous Concentration'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = -3
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3)'
+              VAR(NTM,5) = -1.D+0
 !
 !---  Spread inventory uniformily over domain according to node volume
 !     and define a unique source input for each node in the domain  ---
 !
-            VOLX = 0.D+0
-            do n_x=1,nx
-              n = isrdmw1(n_x,ns) 
-              VOLX = VOLX + VOL(N)
-            enddo
-            call ga_dgop(1,volx,1,'+')
-            do  n_x=1,nx
-              n = isrdmw1(n_x,ns)
-              NSR = NSR + 1
-              IF( NSR.GT.LSR ) THEN
-                INDX = 5
-                CHMSG = 'Number of Sources > Parameter LSR'
-                CALL WRMSGS( INDX )
-              ENDIF
+              VOLX = 0.D+0
+              do n_x=1,nx
+                n = isrdmw1(n_x,ns) 
+                VOLX = VOLX + VOL(N)
+              enddo
+              call ga_dgop(1,volx,1,'+')
+              do  n_x=1,nx
+                n = isrdmw1(n_x,ns)
+                NSR = NSR + 1
+                IF( NSR.GT.LSR ) THEN
+                  INDX = 5
+                  CHMSG = 'Number of Sources > Parameter LSR'
+                  CALL WRMSGS( INDX )
+                ENDIF
 !              ISRDM(1,NSR) = n
 !              ISRDM(2,NSR) = n
 !              ISRDM(3,NSR) = J
 !              ISRDM(4,NSR) = J
 !              ISRDM(5,NSR) = K
 !              ISRDM(6,NSR) = K
-              ISRT(NSR) = ISRTX
-              ISRM(NSR) = 1
-              SRC(1,NTM,NSR) = VAR(NTM,1)
-              SRC(3,NTM,NSR) = VAR(NTM,3)*VOL(N)/VOLX
-              YN(NSL,N) = SRC(3,NTM,NSR)
-              SRC(4,NTM,NSR) = VAR(NTM,4)
-              SRC(5,NTM,NSR) = VAR(NTM,5)
-            enddo
-            GOTO 140
+                ISRT(NSR) = ISRTX
+                ISRM(NSR) = 1
+                SRC(1,NTM,NSR) = VAR(NTM,1)
+                SRC(3,NTM,NSR) = VAR(NTM,3)*VOL(N)/VOLX
+                YN(NSL,N) = SRC(3,NTM,NSR)
+                SRC(4,NTM,NSR) = VAR(NTM,4)
+                SRC(5,NTM,NSR) = VAR(NTM,5)
+              enddo
+              GOTO 140
 !
 !---      Advection-dominated solute release model  ---
 !
-          ELSEIF( ISRTX.LT.-4*NSOLU .AND. ISRTX.GE.-5*NSOLU ) THEN
-            VARB = 'Nodal Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Vertical Depth of Residual Waste'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = 1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
-            VARB = 'Number of Mixing Cells'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,5)
+            ELSEIF( ISRTX.LT.-4*NSOLU .AND. ISRTX.GE.-5*NSOLU ) THEN
+              VARB = 'Nodal Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Vertical Depth of Residual Waste'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = 1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
+              VARB = 'Number of Mixing Cells'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,5)
 !
 !---      Diffusion-dominated solute release model  ---
 !
-          ELSEIF( ISRTX.LT.-5*NSOLU .AND. ISRTX.GE.-6*NSOLU ) THEN
-            VARB = 'Nodal Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Vertical Depth of Residual Waste'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = 1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
-            VARB = 'Diffusion Coefficient'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,5)
-            INDX = 0
-            IUNM = 2
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,5),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,5),', m^2/s)'
+            ELSEIF( ISRTX.LT.-5*NSOLU .AND. ISRTX.GE.-6*NSOLU ) THEN
+              VARB = 'Nodal Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Vertical Depth of Residual Waste'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = 1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
+              VARB = 'Diffusion Coefficient'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,5)
+              INDX = 0
+              IUNM = 2
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,5),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,5),', m^2/s)'
 !
 !---      Solubility-controlled solute release model  ---
 !
-          ELSEIF( ISRTX.LT.-6*NSOLU .AND. ISRTX.GE.-7*NSOLU ) THEN
+            ELSEIF( ISRTX.LT.-6*NSOLU .AND. ISRTX.GE.-7*NSOLU ) THEN
 !
 !---        SRX(2): nodal solute inventory
 !           SRX(3): aqueous solubility  ---
 !
-            VARB = 'Nodal Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,2)
-            VARB = 'Aqueous Solubility of Solute'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,3)
-            INDX = 0
-            IUNM = -3
-            CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', 1/m^3)'
+              VARB = 'Nodal Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,2)
+              VARB = 'Aqueous Solubility of Solute'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,3)
+              INDX = 0
+              IUNM = -3
+              CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', 1/m^3)'
 !
 !---      Solubility-controlled salt cake release model  ---
 !
-          ELSEIF( ISRTX.LT.-7*NSOLU .AND. ISRTX.GE.-8*NSOLU ) THEN
+            ELSEIF( ISRTX.LT.-7*NSOLU .AND. ISRTX.GE.-8*NSOLU ) THEN
 !
 !---        SRX(2): nodal solute inventory
 !           SRX(3): nodal salt cake inventory
 !           SRX(4): salt cake solubility  ---
 !
-            VARB = 'Nodal Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,2)
-            VARB = 'Nodal Salt Cake Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Aqueous Solubility of Salt Cake'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = -3
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3)'
+              VARB = 'Nodal Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,2)
+              VARB = 'Nodal Salt Cake Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Aqueous Solubility of Salt Cake'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = -3
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', 1/m^3)'
 !
 !---      Diffusion-dominated solute release model 
 !         (w/ variable diffusion) ---
 !
-          ELSEIF( ISRTX.LT.-8*NSOLU .AND. ISRTX.GE.-9*NSOLU ) THEN
-            VARB = 'Nodal Solute Inventory'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
-            VARB = 'Vertical Depth of Residual Waste'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,4)
-            INDX = 0
-            IUNM = 1
-            CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
-            VARB = 'Diffusion Coefficient'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-            ': ',VAR(NTM,5)
-            INDX = 0
-            IUNM = 2
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,5),INDX)
-            if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,5),', m^2/s)'
-            VARB = 'Constrictivity'
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,6))
-            if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,6)
-          ENDIF
+            ELSEIF( ISRTX.LT.-8*NSOLU .AND. ISRTX.GE.-9*NSOLU ) THEN
+              VARB = 'Nodal Solute Inventory'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,3)
+              VARB = 'Vertical Depth of Residual Waste'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,4))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,4)
+              INDX = 0
+              IUNM = 1
+              CALL RDUNIT(UNTS,VAR(NTM,4),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,4),', m)'
+              VARB = 'Diffusion Coefficient'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,5))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) write(IWR,'(4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+              ': ',VAR(NTM,5)
+              INDX = 0
+              IUNM = 2
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,5),INDX)
+              if(me.eq.0) write(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,5),', m^2/s)'
+              VARB = 'Constrictivity'
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,6))
+              if(me.eq.0) write(IWR,'(2A,1PE11.4,$)') VARB(1:IVR),': ',VAR(NTM,6)
+            ENDIF
+          endif
 !
 !---  Check for nonascending source times  ---
 !
@@ -910,6 +1020,7 @@
           ENDIF
           SRTMO = VAR(NTM,1)
   100   CONTINUE
+  110   CONTINUE
 !
 !---  Assign values to source variables  ---
 !
