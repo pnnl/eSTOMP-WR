@@ -436,7 +436,6 @@ end interface
       ISTART = 1
       VARB = 'Number of Boundary Condition Cards: '
       CALL RDINT(ISTART,ICOMMA,CHDUM,NLIN)
-      write(*,*) 'me, lbcv,lbtm,nlin',me,lbcv,lbtm,nlin
       allocate(bc_(lbcv,lbtm,nlin))
       bc_ = 0.d0
 !        call add_bcnx_d2field('basex',nlin,idx)
