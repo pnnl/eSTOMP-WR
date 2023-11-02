@@ -18,7 +18,7 @@ module bufferedread
   implicit none
 
   integer MAX_CARDS, MAX_STRLEN, CARD_BUFLEN, MAX_LINES
-  parameter (MAX_CARDS=100, MAX_STRLEN=1024, CARD_BUFLEN=1000)
+  parameter (MAX_CARDS=100, MAX_STRLEN=512, CARD_BUFLEN=1000)
   character(MAX_STRLEN), allocatable :: input_lines(:)
   character(MAX_STRLEN), allocatable :: extfile(:)
   character(MAX_STRLEN) card_name(MAX_CARDS)
@@ -52,11 +52,10 @@ contains
      integer ierr, i, i_ok, me, nlines, nlen, icnt
 
      ! Just in case somebody really needs lots of lines
-     MAX_LINES = 200000
+     MAX_LINES = 3000000 
 #ifdef MAXLINES
      MAX_LINES = MAXLINES
 #endif
-   
      me = ga_nodeid()
      num_cards = 0
      nlines = 0
@@ -66,7 +65,6 @@ contains
      icnt = 0
      allocate(input_lines(MAX_LINES))
      t_ok = .false.
-
      !  Scan through file and find all input blocks
      if (me.eq.0) then
        open(unit=5,file=t_filename,iostat=ierr,status='old')

@@ -70,6 +70,7 @@ SUBROUTINE STOMP1
       use fluxp
       use fdvp
       use sio
+      use coup_well
 #ifdef USE_E4D
       USE E4D_LINK
 #endif
@@ -104,7 +105,8 @@ SUBROUTINE STOMP1
       integer :: size
       CHARACTER*5 ZONE
       INTEGER IDTVAL(8)
-
+!      integer :: n_cw_solu
+      LOGICAL :: use_ga
       double precision :: t_b,t_e1,t_e,t_te,t_tb,t_bk,t_ek
 #ifdef USE_E4D
 !
@@ -151,6 +153,7 @@ SUBROUTINE STOMP1
       tolr = rtol
       tola = atol
       maxiter = 4000
+      n_cw_solu = n_cw
 !
 !---  Check thermodynamic and hydrologic initial states  ---
 !
@@ -206,7 +209,7 @@ SUBROUTINE STOMP1
 #endif
 !
 !--- Initialize PETSC solver
-!     
+!    
       iter = -1 
   t_b = MPI_Wtime()
       call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
@@ -220,8 +223,18 @@ petsc_init_time=t_e-t_b
   t_e = MPI_Wtime()
 jcbp_time = t_e-t_b
   t_b = MPI_Wtime()
-      call PETSC_SOLVER_INIT( petsc_option,tolr,tola,maxiter,isvc,lsize,llsize,gsize, &
-        num_nodes,num_loc_nodes,nnz_d,nnz_o,ixp,imxp,id_l2g )
+!      call PETSC_SOLVER_INIT( petsc_option,tolr,tola,maxiter,isvc,lsize,llsize,gsize, &
+!        num_nodes,num_loc_nodes,nnz_d,nnz_o,ixp,imxp,id_l2g )
+       call PETSC_SOLVER_INIT( petsc_option,tolr,tola,maxiter,isvc,&  !lsize,llsize,gsize, &
+        num_nodes,num_loc_nodes,ixp,imxp,imxp_ncw,id_l2g,Fpetsc_A,Fpetsc_B,Fpetsc_X,Fpetsc_ksp,Fmapping,Fpetsc_pc)
+        if (nsolu.gt.0 .OR. ISLC(40).EQ.1) then
+        !    write(*,*) 'Tpetsc defined'
+            tola = 1.d-9
+            n_cw = 0
+            call PETSC_SOLVER_INIT( petsc_option,tolr,tola,maxiter,1, &!lsize,llsize,gsize, &
+                num_nodes,num_loc_nodes,ixp,imxp,imxp_ncw,id_l2g,Tpetsc_A,Tpetsc_B,Tpetsc_X,Tpetsc_ksp,Tmapping,Tpetsc_pc)
+            n_cw = n_cw_solu
+        endif
   t_e = MPI_Wtime()
 petsc_sinit_time=t_e-t_b
 !
@@ -257,6 +270,16 @@ tmpr_time =tmpr_time+t_e-t_b
        CALL BCP1
   t_e = MPI_Wtime()
 bcp_time = bcp_time+t_e-t_b
+!******************Coupled well- Bryan***************
+!---  Define coupled-well nodes, check coupled-well trajectory,
+!     initialize coupled-well pressure, and increment coupled-well
+!     primary variables  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL CHK_COUP_WELL
+    CALL INCRM_COUP_WELL
+  ENDIF
+!******************************************************
 !
 !---  Compute initial solute concentrations  ---
 !
@@ -365,6 +388,13 @@ ldo_time = ldo_time + t_e-t_b
       call average_v
   t_e = MPI_Wtime()
 average_time =average_time+t_e-t_b
+!*************Coupled well - Bryan********************
+!---  Load old time step arrays for the coupled-well model  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL LDO_COUP_WELL
+  ENDIF
+!****************************************************
   data_flag = 0
 #ifdef USE_E4D
 !
@@ -581,6 +611,16 @@ tmstep_time=tmstep_time+t_e-t_b
 !
   300 CONTINUE
       NITER = NITER + 1
+!************Coupled well - Bryan*****************
+!
+!---  Compute coupled-well fluxes  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+            CALL FLUX_COUP_WELL
+  ENDIF
+
+!**************************************************
+
 !
 !---  Compute boundary saturation, relative permeability, and
 !     thermodynamic properties  ---
@@ -615,20 +655,32 @@ bcf_time=bcf_time+t_e-t_b
 !     (zero flux boundary)  ---
 !
   t_b = MPI_Wtime()
-      CALL JCBWL
+!      CALL JCBWL
+       CALL JCBWL(Fpetsc_A)
   t_e = MPI_Wtime()
 jcbwl_time=jcbwl_time+t_e-t_b
 !
 !---  Modify the Jacobian matrix for boundary conditions  ---
 !
   t_b = MPI_Wtime()
-      CALL BCJ1
+!      CALL BCJ1
+       CALL BCJ1(Fpetsc_A)
   t_e = MPI_Wtime()
 bcj_time =bcj_time+t_e-t_b
 
+!**************Coupled well - Bryan*************************
+!
+!---  Modify Jacobian matrix for coupled-well equations  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL JCB_COUP_WELL(Fpetsc_A)
+  ENDIF
+!***********************************************************
 !
        icnv = 3
-       call petsc_solver_solve(icnv,iter,nstep)
+!       call petsc_solver_solve(icnv,iter,nstep)
+       call petsc_solver_solve(isvc,icnv,iter,nstep,&
+                Fpetsc_ksp,Fpetsc_a,Fpetsc_b,Fpetsc_x,Fpetsc_pc)
 !       IF( ITER >= MAXITER ) THEN
 !          IF( ME.EQ.0 ) WRITE(ISC,'(4X,A,I4,A)') &
 !            'Number of Solver Iterations > Maxiumum, ( ',ITER,' )'
@@ -636,6 +688,14 @@ bcj_time =bcj_time+t_e-t_b
 !            'Number of Solver Iterations > Maxiumum, ( ',ITER,' )'
 !          ICNV = 1 
 !        ENDIF
+!***********Coupled well - Bryan******************
+!
+!---  Update primary variables for coupled wells  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL UPDT_COUP_WELL
+  ENDIF
+!************************************************
 !
 !---  Update primary variables  ---
 !
@@ -646,6 +706,14 @@ bcj_time =bcj_time+t_e-t_b
   t_e = MPI_Wtime()
 updt_time=updt_time+t_e-t_b
 !goto 900
+!*************Coupled well-Bryan****************
+!
+!---  Convergence check for couped wells  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL RSDL_COUP_WELL
+  ENDIF
+!***********************************************
 !
 !---  Compute convergence from maximum relative residuals  ---
 !
@@ -673,9 +741,21 @@ smc_time=smc_time+t_e-t_b
       CALL TMPR1
   t_e = MPI_Wtime()
 tmpr_time=tmpr_time+t_e-t_b
+!*************Coupled well******************
+!
+!---  Increment coupled-well primary variables  ---
+!
+  IF( L_CW.EQ.1 ) THEN
+    CALL INCRM_COUP_WELL
+  ENDIF
+!*******************************************
       GOTO( 200,300,600,900 ) ICNV
   600 CONTINUE
       stomp_iter = stomp_iter + niter
+!
+!---  Integrate coupled-equation sources ---
+!
+  CALL SORIC1     ! for coupled well-Bryan
 !
 !---  Compute aqueous-phase volumetric flux (interior surfaces)  ---
 !
@@ -714,6 +794,8 @@ bcf_time =bcf_time+t_e-t_b
 !        num_nodes,num_loc_nodes,nnz_d,nnz_o,ixp,imxp,id_l2g )
       endif
       call average_v
+      n_cw = 0 ! correct matrix -Bryan
+
       DO 700 NSL = 1,NSOLU
 !
 !---  Courant number limiting  ---
@@ -732,7 +814,8 @@ bcf_time =bcf_time+t_e-t_b
 !
 !---      Solute transport ---
 !
-          CALL TPORT1( NSL )
+          CALL TPORT1(NSL,Tpetsc_ksp,Tpetsc_a,Tpetsc_b,Tpetsc_x,Tpetsc_pc)
+!          CALL TPORT1( NSL )
 !
 !---      Load old sub-time-step solute concentrations  ---
 !
@@ -807,7 +890,8 @@ bcf_time =bcf_time+t_e-t_b
 !
 !---          Solute transport ---
 !
-              CALL TPORT1( NSL )
+              CALL TPORT1(NSL,Tpetsc_ksp,Tpetsc_a,Tpetsc_b,Tpetsc_x,Tpetsc_pc)
+!              CALL TPORT1( NSL )
 !
 !---          Add immobile conservation component fractions   ---
 !
@@ -834,7 +918,8 @@ bcf_time =bcf_time+t_e-t_b
 !
 !---          Solute transport ---
 !
-              CALL TPORT1( NSL )
+              CALL TPORT1(NSL,Tpetsc_ksp,Tpetsc_a,Tpetsc_b,Tpetsc_x,Tpetsc_pc)
+!              CALL TPORT1( NSL )
 ! 
 !---          Add immobile kinetic component fractions   ---
 !
@@ -894,6 +979,7 @@ eckechem_time = eckechem_time+t_ek-t_bk
           TM = TM_CRN
         ENDIF
       ENDIF
+      n_cw = n_cw_solu  ! back to correct n_cw -Bryan
 
 !      call petsc_solver_destroy()
 !for other modes, need to call jcbp
@@ -905,6 +991,13 @@ eckechem_time = eckechem_time+t_ek-t_bk
 !
 !      IF( ISLC(16).EQ.1 ) CALL ELC1
   800 CONTINUE
+
+!
+!---  write coupled well solute flux to file
+!
+    IF (ME.EQ.0) THEN  
+      CALL WRITE_WELL_SOLUTE_FLUX
+    ENDIF
 !
 !---  Surface flux integrator  ---
 !
@@ -926,7 +1019,14 @@ eckechem_time = eckechem_time+t_ek-t_bk
       CALL WRPLOT
       IF( ISLC(18).LT.2 ) CALL WRRST
 
-      call petsc_solver_destroy()
+!      call petsc_solver_destroy()
+!      call petsc_solver_final()
+      call petsc_solver_destroy(Fpetsc_ksp,Fpetsc_a,Fpetsc_b,Fpetsc_x,Fmapping)
+
+      if (nsolu.gt.0 .OR. ISLC(40).EQ.1) then
+         call petsc_solver_destroy(Tpetsc_ksp,Tpetsc_a,Tpetsc_b,Tpetsc_x,Tmapping)
+      endif
+
       call petsc_solver_final()
 !
 !---  Inverse output  ---

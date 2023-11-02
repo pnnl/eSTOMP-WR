@@ -188,6 +188,7 @@
       CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,ADUM)
       ISMX = 0
       IF( INDEX(ADUM(1:),'extended').NE.0 ) ISMX = 1
+      IF( INDEX(ADUM(1:),'webb').NE.0 ) ISMX = 2
       IF( INDEX(ADUM(1:),'entrap').NE.0 ) THEN
         IF( INDEX(ADUM(1:),'van genuchten').NE.0 ) THEN
           ISCHRX = 101

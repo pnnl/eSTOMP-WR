@@ -2,7 +2,7 @@
 
 !----------------------Subroutine--------------------------------------!
 !
-      SUBROUTINE SBND1( NSL )
+      SUBROUTINE SBND1( NSL,petsc_A )
 !
 !-------------------------Disclaimer-----------------------------------!
 !
@@ -123,7 +123,10 @@
         nr = 1
         nc = 1
         n = ibcn(nb)
-        irow = loc_map(n)-1
+!        irow = loc_map(n)-1
+! 2 matrix -BH
+        irow = gloc_map(n)-1
+!
         ir(1) = irow
         ic(1) = irow
         values_(1) = ap

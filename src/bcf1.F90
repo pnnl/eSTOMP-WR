@@ -56,6 +56,7 @@
       USE BCV
       use grid_mod
       use bcvp
+      use plt_atm
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -127,21 +128,19 @@
 !
 !---  Aqueous Neumann else Dirichlet, Saturated, Unit Gradient
 !
-!       write(*,'(a,3I7X,3F16.8,F26.16)') 'me,N,nb,vx,vy,vz,bcx:',me,N,NB,uvxb(nb),uvyb(nb),uvzb(nb),bcx(2) 
-!       write(*,'(a,2I7X,3F16.8)') 'me,N,xc,yc,zc:',me,N,d_xc(n),d_yc(n),d_zc(n)
-!       write(*,'(a,I3)') 'IBCT',IBCT(IEQW,NB)
         IF( IBCT(IEQW,NB).EQ.2 ) THEN
             DO 110 M = 1,ISVF
               q_flux_b(M,NB) = BCX(2)
   110       CONTINUE
         ELSEIF( IBCT(IEQW,NB).EQ.24 ) THEN
+          if(lplant <= 0) then  
             DO 112 M = 1,ISVF
               q_flux_b(M,NB) = BCX(2)
   112       CONTINUE
+          endif
         ELSEIF( IBCT(IEQW,NB).NE.3 ) THEN
             CALL DRCVLB( N,NB )
         ENDIF
-!      write(*,'(a,2I7X,3F26.16)') 'me,N,q_flux_b',me,N,q_flux_b(1:3,NB)
 !--- prepare for surface flux output
         idrx = ibcd(nb)
         if(idrx == -1) then

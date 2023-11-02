@@ -55,6 +55,7 @@
       USE CONST
       USE GRID_MOD
       USE BUFFEREDREAD
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -397,7 +398,137 @@
           IREF(NV) = 31
         ELSEIF( INDEX(ADUM(1:),'ponding height').NE.0 ) THEN
           IREF(NV) = 277
+        ELSEIF( INDEX(ADUM(1:),'evapotranspiration').NE.0 ) THEN
+          IREF(NV) = 289
 
+!********************Coupled well - Bryan ********************
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+      INDEX(ADUM(1:),'well').NE.0 .AND.  &
+      INDEX(ADUM(1:),'press').NE.0 ) THEN
+      IREF(NV) = 138
+      VARB = 'Reference Node Variable: Coupled-Well Number'
+      CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+      IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+        INDX = 7
+        CHMSG = 'Unrecognized Well Number: '
+        IMSG = IREF_CW(NV)
+        CALL WRMSGS( INDX )
+      ENDIF
+      CHREF(138) = 'PWCW'
+      UNREF(138) = 'pa'
+      WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+      NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+      INDEX(ADUM(1:),'well').NE.0 .AND.  &
+      INDEX(ADUM(1:),'mass').NE.0 .AND.  &
+      INDEX(ADUM(1:),'nodal').NE.0 .AND.  &
+      INDEX(ADUM(1:),'co2').NE.0 .AND.  &
+      INDEX(ADUM(1:),'rate').NE.0 ) THEN
+      IREF(NV) = 142
+      VARB = 'Reference Node Variable: Coupled-Well Number'
+      CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+      IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+        INDX = 7
+        CHMSG = 'Unrecognized Well Number: '
+        IMSG = IREF_CW(NV)
+        CALL WRMSGS( INDX )
+      ENDIF
+      CHREF(142) = 'QNRA'
+      UNREF(142) = 'kg/s'
+      WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+      NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+      INDEX(ADUM(1:),'well').NE.0 .AND.  &
+      INDEX(ADUM(1:),'mass').NE.0 .AND.  &
+      INDEX(ADUM(1:),'nodal').NE.0 .AND.  &
+      INDEX(ADUM(1:),'water').NE.0 .AND.  &
+      INDEX(ADUM(1:),'rate').NE.0 ) THEN
+      IREF(NV) = 145
+      VARB = 'Reference Node Variable: Coupled-Well Number'
+      CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+      IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+        INDX = 7
+        CHMSG = 'Unrecognized Well Number: '
+        IMSG = IREF_CW(NV)
+        CALL WRMSGS( INDX )
+      ENDIF
+      CHREF(145) = 'QNRW'
+      UNREF(145) = 'kg/s'
+      WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+      NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+      INDEX(ADUM(1:),'well').NE.0 .AND. &
+     INDEX(ADUM(1:),'mass').NE.0 .AND. &
+     INDEX(ADUM(1:),'co2').NE.0 .AND. &
+     INDEX(ADUM(1:),'rate').NE.0 ) THEN
+     IREF(NV) = 349
+     VARB = 'Reference Node Variable: Coupled-Well Number'
+     CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+     IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+       INDX = 7
+       CHMSG = 'Unrecognized Well Number: '
+       IMSG = IREF_CW(NV)
+       CALL WRMSGS( INDX )
+     ENDIF
+     CHREF(349) = 'QMRA'
+     UNREF(349) = 'kg/s'
+     WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+     NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+     INDEX(ADUM(1:),'well').NE.0 .AND. &
+     INDEX(ADUM(1:),'mass').NE.0 .AND. &
+     INDEX(ADUM(1:),'co2').NE.0 .AND. &
+     INDEX(ADUM(1:),'integral').NE.0 ) THEN
+     IREF(NV) = 350
+     VARB = 'Reference Node Variable: Coupled-Well Number'
+     CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+     IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+       INDX = 7
+       CHMSG = 'Unrecognized Well Number: '
+       IMSG = IREF_CW(NV)
+       CALL WRMSGS( INDX )
+     ENDIF
+     CHREF(350) = 'QMIA'
+     UNREF(350) = 'kg'
+     WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+        NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+      INDEX(ADUM(1:),'well').NE.0 .AND.  &
+      INDEX(ADUM(1:),'mass').NE.0 .AND.  &
+      INDEX(ADUM(1:),'water').NE.0 .AND.  &
+      INDEX(ADUM(1:),'rate').NE.0 ) THEN
+      IREF(NV) = 351
+      VARB = 'Reference Node Variable: Coupled-Well Number'
+      CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+      IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+        INDX = 7
+        CHMSG = 'Unrecognized Well Number: '
+        IMSG = IREF_CW(NV)
+        CALL WRMSGS( INDX )
+      ENDIF
+      CHREF(351) = 'QMRW'
+      UNREF(351) = 'kg/s'
+      WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+      NCH = NCH+11
+    ELSEIF( INDEX(ADUM(1:),'coupled').NE.0 .AND. &
+          INDEX(ADUM(1:),'well').NE.0 .AND.  &
+      INDEX(ADUM(1:),'mass').NE.0 .AND.  &
+      INDEX(ADUM(1:),'water').NE.0 .AND.  &
+      INDEX(ADUM(1:),'integral').NE.0 ) THEN
+      IREF(NV) = 352
+      VARB = 'Reference Node Variable: Coupled-Well Number'
+      CALL RDINT(ISTART,ICOMMA,CHDUM,IREF_CW(NV))
+      IF( IREF_CW(NV).LT.1 .OR. IREF_CW(NV).GT.N_CW ) THEN
+        INDX = 7
+        CHMSG = 'Unrecognized Well Number: '
+        IMSG = IREF_CW(NV)
+        CALL WRMSGS( INDX )
+      ENDIF
+      CHREF(352) = 'QMIW'
+      UNREF(352) = 'kg'
+      WRITE(ADUM(NCH+1:NCH+11),'(A,I3)') ': well #',IREF_CW(NV)
+      NCH = NCH+11
+!***********************************************************
 ! Add exchange, solid, gas, napl species conc per total volume
         ELSEIF( (INDEX(ADUM(1:),'solid solute volumetric conc').NE.0) .OR. &
         ((INDEX(ADUM(1:),'solid species volumetric conc').NE.0) .AND. &
@@ -803,6 +934,8 @@
           IPLOT(NV) = 249
         ELSEIF( INDEX(ADUM(1:),'aqueous relative perm').NE.0 ) THEN
           IPLOT(NV) = 31
+        ELSEIF( INDEX(ADUM(1:),'evapotranspiration').NE.0 ) THEN
+          IPLOT(NV) = 289
 
 ! Add total exchanged, solid, gas and NAPL per total volume
         ELSEIF( (INDEX(ADUM(1:),'solid solute volumetric conc').NE.0) .OR. &

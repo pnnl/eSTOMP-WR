@@ -1,4 +1,6 @@
-SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,G_SIZE,num_nodes,num_loc_nodes,nnz_d,nnz_o,ixp,imxp,id_l2g )
+!SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,G_SIZE,num_nodes,num_loc_nodes,nnz_d,nnz_o,ixp,imxp,id_l2g )
+SUBROUTINE PETSC_SOLVER_INIT(petsc_option,RTOL,ATOL,MAXITER,NUK,num_nodes,num_loc_nodes,ixp,imxp,imxp_ncw,id_l2g, &
+                        petsc_A,petsc_B,petsc_X,petsc_ksp,mapping,petsc_pc)
 !
 !---  Notice  ---
 !
@@ -30,6 +32,8 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 !---  Specification Statements  ---
 !
   USE PETSCAPP
+  USE COUP_WELL
+  USE GLB_PAR
 !
 !---  Implicit Statements  ---
 !
@@ -43,6 +47,9 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
   integer, dimension(num_nodes) :: ixp,imxp,id_l2g
   integer :: num_nodes, nrx,n,m, num_loc_nodes
   integer :: petsc_option
+  integer, dimension(num_nodes) :: imxp_ncw
+  integer :: isvcx
+  integer :: b_size
 !
 !---  PETSc Fortran Includes  ---
 !
@@ -57,16 +64,30 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 !---  Locals  ---
 !
   INTEGER :: NPES
-  PetscInt :: l2gmap(ll_size),output(12),imxpx(12)
+!  PetscInt :: l2gmap(ll_size),output(12),imxpx(12)
+  PetscInt :: output(12),imxpx(12)
+  PetscInt, dimension(:), allocatable :: l2gmap
   PetscInt :: nr,num_nodesx
   PetscErrorCode :: ierr
+  Vec     :: petsc_x, Petsc_b
+  Mat     :: petsc_A
+  KSP     :: petsc_ksp
+  KSP     :: petsc_pc
+  ISLocalToGlobalMapping :: mapping
   integer :: me
+  double precision :: dtol
+  integer:: kmit
+  integer :: iwx,lwx
+  integer :: ndifx,nx
+  integer :: lw_size,n_cwx,iwnx,gidx
+  integer :: lsize,llsize,gsize
 !
 !---  Executable Statements  ---
 !
   me = ga_nodeid()
-  LOCAL_SIZE = L_SIZE
-  GLOBAL_SIZE = G_SIZE
+!  LOCAL_SIZE = L_SIZE
+!  GLOBAL_SIZE = G_SIZE
+  isvcx = nuk   ! 2 matrix -Bryan
 !
 !--- E4D PATCH
 !    Split MPI_COMM_WORLD
@@ -75,30 +96,112 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 !--- END E4D PATCH
 
 !--- Create mapping b/w local and global ordering
+!  nrx = 0
+!  do n=1,num_nodes
+!    if(ixp(n) <= 0) cycle
+!    do m=1,nuk
+!      nrx = nrx+1
+!      l2gmap(nrx) = (imxp(n)-1)*nuk+m-1
+!!print *,'imxp-=-------imxp',me,n,imxp(n),nrx,l2gmap(nrx)
+!!,nrx,l2gmap(nrx),(imxp(n)-1)*nuk+m-1,nuk
+!    enddo
+!  enddo
+!  nr = nrx
+
+!--- Create mapping b/w local and global ordering
+!************Coupled well - Bryan**************************
+!**********************************************************
+!**************for 2 matrix - Bryan
+  l_size = 0
+  DO n=1,num_loc_nodes
+      nx = id_l2g(n)
+      IF( ixp(nx) <= 0 ) CYCLE
+      l_size = l_size + isvcx
+  END DO
+
+  if(l_cw > 0) then
+    lw_size = 0
+    do n_cwx = 1,n_l_cw
+      iwnx = id_cw(3,n_cwx)
+      gidx = iwi_cw(iwnx)
+! injection node, withdrawal later...
+      if(gidx == 1) then
+        lw_size = lw_size+1
+      endif
+    enddo
+  endif
+
+  if(n_cw /= 0) l_size = l_size + lw_size
+  g_size = l_size
+  call ga_igop(1,g_size,1,'+')
+
+  ll_size = 0
+
+  DO n=1,num_nodes
+    IF( ixp(n) <= 0 ) CYCLE
+    ll_size = ll_size + isvcx
+  END DO
+  if(n_cw /= 0) ll_size = ll_size+lw_size
+!  write(*,*) 'll_size:',ll_size
+  allocate(l2gmap(ll_size))
+  lsize = l_size
+  gsize = g_size
+  llsize = ll_size
+  LOCAL_SIZE = L_SIZE
+!  GLOBAL_SIZE = G_SIZE
+  CALL MPI_COMM_SIZE( MPI_COMM_WORLD,NPES,IERR )
+
+!*******************************************************
+!  if(.not.allocated(l2gmap)) allocate(l2gmap(ll_size))
   nrx = 0
-  do n=1,num_nodes
+  if(n_cw <= 0) then
+   do n=1,num_nodes
     if(ixp(n) <= 0) cycle
     do m=1,nuk
       nrx = nrx+1
-      l2gmap(nrx) = (imxp(n)-1)*nuk+m-1
-!print *,'imxp-=-------imxp',me,n,imxp(n),nrx,l2gmap(nrx)
-!,nrx,l2gmap(nrx),(imxp(n)-1)*nuk+m-1,nuk
+      l2gmap(nrx) = (imxp_ncw(n)-1)*nuk+m-1
     enddo
-  enddo
+   enddo
+  else
+   allocate(mmap_cw(n_cw))
+   mmap_cw = 0
+   do n=1,num_nodes
+    if(ixp(n) <= 0) cycle
+    if(iwt_cw(n) > 0) then
+      iwx = iwt_cw(n)
+      nrx = nrx+1
+!      if(nrx.eq.1) then
+!       l2gmap(nrx) = (imxp(n)-iwx-lwstart-1)*nuk+lwstart-1
+       l2gmap(nrx) = imxp(n)-nuk
+!      else
+       l2gmap(nrx) = imxp(n)-nuk-1
+!      endif
+      lwx = w_loc(iwx)
+      mmap_cw(id_cw(7,lwx)) = l2gmap(nrx)
+    endif
+    do m=1,nuk
+      nrx = nrx+1
+      l2gmap(nrx) = imxp(n)-nuk+m-1
+    enddo
+   enddo
+   call ga_igop(1,mmap_cw,n_cw,'max')
+  endif
   nr = nrx
+!  write(*,*) 'mmap_cw',mmap_cw
+!***************************************************************
 !
 !---  Deallocate matrix pointer array memory  ---
 !
   ALLOCATE( D_NNZ(L_SIZE) )
   ALLOCATE( O_NNZ(L_SIZE) )
-  ALLOCATE( N_COL(L_SIZE) )
-  ALLOCATE( N_ROW(L_SIZE) )
-  ALLOCATE( VALUES(L_SIZE) )
+!  ALLOCATE( N_COL(L_SIZE) )
+!  ALLOCATE( N_ROW(L_SIZE) )
+!  ALLOCATE( VALUES(L_SIZE) )
 !
 !---  Initialize matrix pointers  ---
 !
-
-  CALL INIT_SPARSE( ixp,nnz_d,nnz_o,id_l2g,num_nodes,num_loc_nodes,l_size,nuk,d_nnz,o_nnz )
+  CALL INIT_SPARSE(l_size,nuk,d_nnz,o_nnz )
+!  CALL INIT_SPARSE( ixp,nnz_d,nnz_o,id_l2g,num_nodes,num_loc_nodes,l_size,nuk,d_nnz,o_nnz )
 !
 !---  Create sequential or parallel PETSc solution vector  ---
 !
@@ -130,7 +233,8 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 !#ifdef PETSC_3_3
 !   call ISLocalToGlobalMappingCreate(PETSC_COMM_WORLD, nrx, l2gmap,PETSC_COPY_VALUES, mapping,ierr)
 !#else
-   call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, mapping,ierr)
+   call ISLocalToGlobalMappingCreate(PETSC_COMM_world, nrx, l2gmap,mapping,ierr)
+!   call ISLocalToGlobalMappingCreate(PETSC_COMM_SELF, nrx, l2gmap, mapping,ierr)
 !#endif
   endif
 !num_nodesx = num_nodes
@@ -198,6 +302,9 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
   CALL KSPSetFromOptions( petsc_ksp,IERR )
   if(petsc_option == 1) &
   call kspsettolerances(petsc_ksp,rtol,atol,petsc_default_double_precision,petsc_default_integer,ierr)
+  deallocate(l2gmap)
+  DEALLOCATE( D_NNZ )
+  DEALLOCATE( O_NNZ )
 !
 !---  Return to calling routine  ---
 !
@@ -208,7 +315,7 @@ SUBROUTINE PETSC_SOLVER_INIT( petsc_option,RTOL,ATOL,MAXITER,NUK,L_SIZE,LL_size,
 END SUBROUTINE PETSC_SOLVER_INIT
 
 
-SUBROUTINE PETSC_SOLVER_DESTROY()
+SUBROUTINE PETSC_SOLVER_DESTROY(petsc_ksp,petsc_a,petsc_b,petsc_x,mapping)
 !
 !---  Notice  ---
 !
@@ -248,6 +355,10 @@ SUBROUTINE PETSC_SOLVER_DESTROY()
 !---  Locals  ---
 !
   INTEGER :: IERR
+  Vec     :: petsc_x, Petsc_b
+  Mat     :: petsc_A
+  KSP     :: petsc_ksp
+  ISLocalToGlobalMapping :: mapping
 !
 !---  Destroy PETSc solution vector  ---
 !
@@ -268,11 +379,11 @@ SUBROUTINE PETSC_SOLVER_DESTROY()
 !
 !---  Deallocate matrix pointer array memory  ---
 !
-  DEALLOCATE( D_NNZ )
-  DEALLOCATE( O_NNZ )
-  DEALLOCATE( N_COL )
-  DEALLOCATE( N_ROW )
-  DEALLOCATE( VALUES )
+!  DEALLOCATE( D_NNZ )
+!  DEALLOCATE( O_NNZ )
+!  DEALLOCATE( N_COL )
+!  DEALLOCATE( N_ROW )
+!  DEALLOCATE( VALUES )
 !
 !---  Return to calling routine  ---
 !
@@ -340,7 +451,8 @@ SUBROUTINE PETSC_SOLVER_FINAL
 !
 END SUBROUTINE PETSC_SOLVER_FINAL
 
-SUBROUTINE PETSC_SOLVER_SOLVE( ICNV,ITER,nstep )
+SUBROUTINE PETSC_SOLVER_SOLVE(nuk,ICNV,ITER,nstep,&
+                 petsc_ksp,petsc_a,petsc_b,petsc_x,petsc_pc  )
 !
 !---  Notice  ---
 !
@@ -402,23 +514,33 @@ SUBROUTINE PETSC_SOLVER_SOLVE( ICNV,ITER,nstep )
   PetscErrorCode   ierr
   KSPConvergedReason reason
   double precision :: t_b,t_e
+  Vec     :: petsc_x, Petsc_b
+  Mat     :: petsc_A
+  KSP     :: petsc_ksp
+  PC      :: petsc_pc
+  integer :: nuk
 !
 !---  Viewing option flag ---
 !
   t_b = MPI_Wtime()
       me = ga_nodeid()
       use_ga = .true.
+  
+  call VecGetLocalSize(petsc_B,local_size,ierr)
+  ALLOCATE( N_COL(LOCAL_SIZE) )
+  ALLOCATE( VALUES(LOCAL_SIZE) )
+
   IFLAG = ( ITER < 0 )
 !
 !--- E4D PATCH 
 !    Split MPI_COMM_WORLD
-!  IF( IFLAG ) CALL MPI_COMM_SIZE( MPI_COMM_WORLD,NPES,IERR )
-   IF( IFLAG ) CALL MPI_COMM_SIZE( PETSC_COMM_WORLD,NPES,IERR )
+  IF( IFLAG ) CALL MPI_COMM_SIZE( MPI_COMM_WORLD,NPES,IERR )
+!   IF( IFLAG ) CALL MPI_COMM_SIZE( PETSC_COMM_WORLD,NPES,IERR )
 !--- END E4D PATCH
 !
 !---  Load and assemble problem vector ---
 !
-  CALL LOAD_PETSC_VECTOR( N_COL,VALUES )
+  CALL LOAD_PETSC_VECTOR( N_COL,VALUES,NUK )
   CALL VecSetValues( petsc_B,LOCAL_SIZE,N_COL,VALUES,INSERT_VALUES,IERR )
 !  CALL MPI_BARRIER( MPI_COMM_WORLD,IERR)
   CALL VecAssemblyBegin( petsc_B,IERR )
@@ -504,8 +626,10 @@ SUBROUTINE PETSC_SOLVER_SOLVE( ICNV,ITER,nstep )
 !---  Copy PETSc solution vector into STOMP solution vector  ---
 !
   CALL VecGetOwnershipRange(petsc_X,IVL,IVH,IERR) 
-  CALL DUMP_PETSC_VECTOR( X_ARRAY(I_X+1),IVL )
-  CALL VecRestoreArray( petsc_X,X_ARRAY,I_X,IERR ) 
+  CALL DUMP_PETSC_VECTOR( X_ARRAY(I_X+1),IVL,NUK )
+  CALL VecRestoreArray( petsc_X,X_ARRAY,I_X,IERR )
+  DEALLOCATE( N_COL )
+  DEALLOCATE( VALUES ) 
   t_e = MPI_Wtime();
   petsc_time = petsc_time + t_e-t_b
 !
@@ -638,69 +762,225 @@ SUBROUTINE SET_PETSC_VALUE( IR,IC,VALUE )
 !
 END SUBROUTINE SET_PETSC_VALUE
 
-SUBROUTINE init_sparse(ixp,nnz_d,nnz_o,id_l2g,num_nodes,num_loc_nodes,lsize,nuk,d_nnz,o_nnz)
+!SUBROUTINE init_sparse(ixp,nnz_d,nnz_o,id_l2g,num_nodes,num_loc_nodes,lsize,nuk,d_nnz,o_nnz)
+SUBROUTINE init_sparse(lsize,nuk,d_nnz,o_nnz)
+  USE COUP_WELL
+  use grid
+  use grid_mod
+  use soltn
 !
   implicit none
 !
-  integer :: n, nr, num_nodes, nuk, m, lsize, nx,num_loc_nodes
-  integer, dimension(lsize) :: d_nnz, o_nnz 
-  integer, dimension(num_nodes) :: ixp
-  integer, dimension(num_loc_nodes) :: nnz_d, nnz_o,id_l2g
+!  integer :: n, nr, num_nodes, nuk, m, lsize, nx,num_loc_nodes
+!  integer, dimension(lsize) :: d_nnz, o_nnz 
+!  integer, dimension(num_nodes) :: ixp
+!  integer, dimension(num_loc_nodes) :: nnz_d, nnz_o,id_l2g
+  integer :: isvc,n, nr,  nuk, m, lsize, nx
+  integer, dimension(lsize) :: d_nnz, o_nnz
+  integer, dimension(num_loc_nodes) :: nnz_d, nnz_o
+  integer :: nlwx,ngwx
+  integer :: n_cwx,iwnx,g_n_cw,iwt_cwnx,iwfx,gtiwx,ltiwx,nfx
+  integer :: id_dng,id_upg,id_dn,id_up
 !
   nr = 0
   d_nnz = 0
   o_nnz = 0
-  do n = 1,num_loc_nodes
+!  do n = 1,num_loc_nodes
+!    nx = id_l2g(n)
+!!    nx = n
+!    if(ixp(nx) <= 0) cycle
+!    do m=1,nuk
+!      nr = nr+1  
+!      d_nnz(nr) = nnz_d(n)
+!      o_nnz(nr) = nnz_o(n)
+!    enddo
+!  enddo
+  ! ***********Coupled well - Bryan **************
+  isvc = nuk
+!    if(nuk == 6 ) isvc = 1
+    nnz_d = isvc
+    nnz_o = 0
+    DO n=1,num_cnx
+      id_dng = conn_dn(n)
+      id_upg = conn_up(n)
+      id_dn = id_g2l(id_dng)
+      id_up = id_g2l(id_upg)
+      if( id_dn.lt.0 .and. ixp(id_dng).gt.0 ) then
+        nnz_o(id_up) = nnz_o(id_up) + isvc
+      elseif( id_up.lt.0 .and. ixp(id_upg).gt.0 ) then
+        nnz_o(id_dn) = nnz_o(id_dn) + isvc
+      else
+        if(ixp(id_upg).gt.0) nnz_d(id_up) = nnz_d(id_up) + isvc
+        if(ixp(id_dng).gt.0) nnz_d(id_dn) = nnz_d(id_dn) + isvc
+      endif
+    END DO
+    if(n_cw > 0 ) then
+     do n_cwx = 1,n_l_cw
+         iwnx = id_cw(3,n_cwx)
+         nx = iwn_cw(iwnx)
+         n = id_g2l(nx)
+         g_n_cw = id_cw(7,n_cwx)
+         iwt_cwnx = iwt_cw(nx)
+         if(iwt_cwnx > 0) then
+!           nnz_o(n) = nnz_o(n)+1
+!         else
+!           nnz_d(n) = nnz_d(n)+1
+           nnz_d_cw(g_n_cw) = nnz_d_cw(g_n_cw) + 1
+!         else
+!           nnz_o(n) = nnz_o(n)+1
+        endif
+         do iwfx = id_cw(5,n_cwx),id_cw(6,n_cwx)
+           nnz_d_cw(g_n_cw) = nnz_d_cw(g_n_cw) + isvc
+           nfx = id_g2l(iwf_cw(iwfx))
+           if(iwt_cwnx > 0) then
+             nnz_d(nfx) = nnz_d(nfx) + 1
+           else
+             nnz_o(nfx) = nnz_o(nfx) + 1
+           endif
+         enddo
+         gtiwx = g_iwf_cw(g_n_cw)
+         ltiwx = id_cw(6,n_cwx)-id_cw(5,n_cwx)+1
+         if(gtiwx > ltiwx) then
+           nnz_o_cw(g_n_cw) = nnz_o_cw(g_n_cw) + (gtiwx-ltiwx)*isvc
+         endif
+       enddo
+    endif
+
+      if(n_cw <= 0) then
+   do n = 1,num_loc_nodes
     nx = id_l2g(n)
-!    nx = n
     if(ixp(nx) <= 0) cycle
-    do m=1,nuk
-      nr = nr+1  
+    do m=1,isvc
+      nr = nr+1
       d_nnz(nr) = nnz_d(n)
       o_nnz(nr) = nnz_o(n)
     enddo
-  enddo
+   enddo
+  else
+   do n = 1,num_loc_nodes
+    nx = id_l2g(n)
+    if(ixp(nx) <= 0) cycle
+    nlwx = iwt_cw(nx)
+    if(nlwx > 0) then
+      nlwx = w_loc(nlwx)
+      nr=nr+1
+      ngwx = id_cw(7,nlwx)
+      d_nnz(nr) = nnz_d_cw(ngwx)
+      o_nnz(nr) = nnz_o_cw(ngwx)
+    endif
+    do m=1,isvc
+      nr = nr+1
+      d_nnz(nr) = nnz_d(n)
+      o_nnz(nr) = nnz_o(n)
+    enddo
+   enddo
+  endif
+!***************************************************
 !
 END SUBROUTINE init_sparse
 
-subroutine load_petsc_vector(ir,value)
+subroutine load_petsc_vector(ir,value,isvcx)
  use grid
  use grid_mod
  use jacob
 use soltn
+USE COUP_WELL
  implicit none
  integer, dimension(lsize) :: ir
  double precision, dimension(lsize) :: value
- integer :: n, nx, nr, nuk,m
- nuk = isvc
+! integer :: n, nx, nr, nuk,m
+ integer :: n, nx, nr, nuk,m,isvcx
+ integer :: ilwx,nwx,gnwx,n_locx,incx
+ nuk = isvcx
  nr = 0
- do n=1,num_loc_nodes
+! do n=1,num_loc_nodes
+!   nx = id_l2g(n)
+!   if( ixp(nx) <= 0 ) cycle
+!   do m=1,nuk
+!     nr = nr + 1
+!     ir(nr) = (imxp(nx)-1)*nuk+m-1
+!     value(nr) = -1.d0*residual(m,nx)
+!!if(nstep.eq.26)print *,'nx-------------------load',value(nr),loc2nat(nx),niter
+!   enddo
+! enddo
+!***************Coupled well - Bryan*********************
+if(n_cw <= 0) then
+  do n=1,num_loc_nodes
    nx = id_l2g(n)
    if( ixp(nx) <= 0 ) cycle
    do m=1,nuk
      nr = nr + 1
-     ir(nr) = (imxp(nx)-1)*nuk+m-1
+     ir(nr) = (imxp_ncw(nx)-1)*nuk+m-1
      value(nr) = -1.d0*residual(m,nx)
-!if(nstep.eq.26)print *,'nx-------------------load',value(nr),loc2nat(nx),niter
    enddo
- enddo
+  enddo
+ else
+  do n=1,num_loc_nodes
+   nx = id_l2g(n)
+   if( ixp(nx) <= 0 ) cycle
+    ilwx = iwt_cw(nx)
+    if(ilwx > 0) then
+      nwx = w_loc(ilwx)
+      nr = nr+1
+      ir(nr) = mmap_cw(id_cw(7,nwx))
+      value(nr) = rs_cw(1,nwx)
+    endif
+    incx = (imxp(nx)-lstart)-n
+    do m=1,nuk
+      nr = nr+1
+      ir(nr) = imxp(nx)-nuk+m-1
+      value(nr) = -1.d0*residual(m,nx)
+    enddo
+  enddo
+ endif
+!***********************************************************
 end subroutine load_petsc_vector
 
-subroutine dump_petsc_vector(vec,ivl)
+subroutine dump_petsc_vector(vec,ivl,isvcx)
  use grid
  use grid_mod
  use jacob
+ USE COUP_WELL
  implicit none
  double precision, dimension(lsize) :: vec
  integer :: n, nx, nr, nuk,m, ivl
- nuk = isvc
+ integer :: ilwx,nwx,gnwx,isvcx
+ nuk = isvcx
  nr = 0
- do n=1,num_loc_nodes
+! do n=1,num_loc_nodes
+!   nx = id_l2g(n)
+!   if( ixp(nx) <= 0 ) cycle
+!   do m=1,nuk
+!     nr = nr + 1
+!     blu(m,nx) = vec(nr)
+!   enddo
+! enddo
+
+!*************Coupled well - Bryan*************
+ if(n_cw <= 0) then
+  do n=1,num_loc_nodes
    nx = id_l2g(n)
    if( ixp(nx) <= 0 ) cycle
    do m=1,nuk
      nr = nr + 1
      blu(m,nx) = vec(nr)
    enddo
- enddo
+  enddo
+ else
+  do n=1,num_loc_nodes
+   nx = id_l2g(n)
+   if( ixp(nx) <= 0 ) cycle
+   ilwx = iwt_cw(nx)
+   if(ilwx > 0) then
+     nwx = w_loc(ilwx)
+     nr = nr+1
+     blu_cw(nwx) = vec(nr)
+   endif
+   do m=1,nuk
+     nr = nr + 1
+     blu(m,nx) = vec(nr)
+   enddo
+  enddo
+ endif
+!***********************************************
 end subroutine dump_petsc_vector

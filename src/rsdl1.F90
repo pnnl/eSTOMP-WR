@@ -63,6 +63,7 @@
       USE FDVP
       USE CONST
       use grid_mod
+      USE COUP_WELL
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -152,12 +153,19 @@
 !---  Unconverged solution Newton-Raphson iteration limit exceeded  ---
 !
       IF( ICNV.EQ.1 ) THEN
-        if(me.eq.0)WRITE(ISC,'(10X,A)') '---  Convergence Failure  ---'
-        if(me.eq.0)WRITE(IWR,'(10X,A)') '---  Convergence Failure  ---'
-        if(me.eq.0)WRITE(ISC,'(4X,A,1PE11.4,A,I6)') 'Water Equation Maximum Residual = ', &
-         RSD(IEQW),' Node = ',NSD(IEQW)
-        if(me.eq.0)WRITE(IWR,'(4X,A,1PE11.4,A,I6)') 'Water Equation Maximum Residual = ', &
-         RSD(IEQW),' Node = ',NSD(IEQW)
+!        if(me.eq.0)WRITE(ISC,'(10X,A)') '---  Convergence Failure  ---'
+!        if(me.eq.0)WRITE(IWR,'(10X,A)') '---  Convergence Failure  ---'
+!        if(me.eq.0)WRITE(ISC,'(4X,A,1PE11.4,A,I6)') 'Water Equation Maximum Residual = ', &
+!         RSD(IEQW),' Node = ',NSD(IEQW)
+!        if(me.eq.0)WRITE(IWR,'(4X,A,1PE11.4,A,I6)') 'Water Equation Maximum Residual = ', &
+!         RSD(IEQW),' Node = ',NSD(IEQW)
+         IF( RSDX.GE.1.D+2 .AND. RSD_CW.LT.1.D+2 ) THEN
+                        IF(ME.EQ.0) WRITE(ISC,'(10X,A)') '---  Excessive Residual  ---'
+                        IF(ME.EQ.0) WRITE(IWR,'(10X,A)') '---  Excessive Residual  ---'
+        ELSEIF( RSD_CW.LT.RSDMX ) THEN
+                        IF(ME.EQ.0) WRITE(ISC,'(10X,A)') '---  Convergence Failure  ---'
+                        IF(ME.EQ.0) WRITE(IWR,'(10X,A)') '---  Convergence Failure  ---'
+        ENDIF
 !
 !---  Reduce time step  ---
 !
@@ -193,6 +201,14 @@
             IPH(2,N) = IPH(1,N)
   400     CONTINUE
           call ga_sync
+!
+!---      Coupled-well pressure  --- ! coupled well-Bryan
+!
+      IF( L_CW.EQ.1 ) THEN
+        DO 402 NCW = 1,N_CW
+          P_CW(2,NCW) = P_CW(1,NCW)
+      402       CONTINUE
+      ENDIF
 !
 !---  Number of time step reductions failure: stop simulation  ---
 !

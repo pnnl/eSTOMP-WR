@@ -58,7 +58,7 @@
 !     21 - Falling Pond
 !     22 - Free Boundary
 !     23 - Inflow-Outflow Aqueous
-!     24 - Potential Evaporation
+!     24 - Potential Evapotranspiration
 !     25 - Fluctuating Water Table
 !     26 - Dirichlet-Outflow
 !     27 - Diode
@@ -102,6 +102,7 @@
       USE GRID
       USE BUFFEREDREAD
       USE BCVP 
+      USE PLT_ATM
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -179,7 +180,7 @@ end interface
 !----------------------Type Declarations-------------------------------!
 !
       CHARACTER*64 ADUM,BDUM(LUK+LSOLU+1),FDUM,SDUM,EXTLINE
-      CHARACTER*64 UNTS
+      CHARACTER*128 UNTS,TMP,PNAME
       CHARACTER*24 CHLB(3)
       CHARACTER*32 CHTYP(45)
       CHARACTER*512 CHDUM
@@ -252,11 +253,17 @@ end interface
   integer :: ix_1,jx_1,kx_1,lbc_x
   double precision:: t_e,t_b,t_b1,t_e1,t_b2,t_e2,time1x,time2x,time3x,t_b3,t_e3
   integer :: ierr
-
+  integer :: pft
+  integer :: dim1
+  real*8 :: time, pet
+  CHARACTER*64 :: time_unit,pet_unit
   ! Functions
   logical rd_sparse_ijkv
   LOGICAL :: use_ga
-
+  real*8 ::z_up,z_bt
+  real*8 :: epsl1=1.0E-12
+  real*8, dimension(:,:), allocatable :: beta_tmp
+  real(kind=dp), dimension(:), allocatable ::var_tmp
 !
 !----------------------Common Blocks-----------------------------------!
 !
@@ -278,7 +285,7 @@ end interface
       'Inflow Gas-Phase','Inflow NAPL','Seepage Face','Convective', &
       'Inflow-Outflow Volumetric','Falling Head','Falling Pond', &
       'Free Boundary','Inflow-Outflow Aqueous', &
-      'Potential Evaporation','Fluctuating Water Table', &
+      'Potential Evapotranspiration','Fluctuating Water Table', &
       'Dirichlet-Outflow','Diode', &
       'Convective-Radiative','Convective Ground Surface', &
       'Shuttleworth-Wallace','Bare Shuttleworth-Wallace', &
@@ -416,13 +423,19 @@ end interface
       CARD = 'Boundary Conditions Card'
       ICD = INDEX( CARD,'  ' )-1
       if(me.eq.0) WRITE(IWR,'(//,3A)') ' ~ ',CARD(1:ICD),': '
+      
+            ! read roota and rootb for root profile
+      if (lplant > 0) then
+        allocate(veg_type(ldx*ldy))
+        veg_type = 1
+      endif
+!
       NBC = 0
       T_OK = BUFFEREDREAD_GETLINE(CHDUM)
       CALL LCASE( CHDUM )
       ISTART = 1
       VARB = 'Number of Boundary Condition Cards: '
       CALL RDINT(ISTART,ICOMMA,CHDUM,NLIN)
-!      write(*,*) 'me, nlin',me,nlin
       allocate(bc_(lbcv,lbtm,nlin))
       bc_ = 0.d0
 !        call add_bcnx_d2field('basex',nlin,idx)
@@ -507,17 +520,7 @@ end interface
           KE = 0
           T_OK = RD_SPARSE_IJKV(FDUM(1:NCH),TEMP_F(1,1),LBC,4,KE)
           call ga_igop(22,ke,1,'max')
-!          T_OK = BUFFEREDREAD_EXTFILE(FDUM(1:NCH),IUNIT,NLINES)
-!          DO WHILE( KE.LT.NLINES )
-!            KE = KE+1
-!            T_OK = BUFFEREDREAD_GETLINE_EXT( EXTLINE,KE,NLINES )
-!            READ(EXTLINE,*) IX,JX,KX,IBCDX
-!            TEMP_F(KE,1) = IX
-!            TEMP_F(KE,2) = JX
-!            TEMP_F(KE,3) = KX
-!            TEMP_F(KE,4) = IBCDX
-!          END DO
-!            T_OK = BUFFEREDREAD_TERM_EXT()
+            
         ENDIF
 !
 !---    Read boundary types  ---
@@ -635,9 +638,17 @@ end interface
            ITYP(IEQW) = 21
         ELSEIF( INDEX(BDUM(1)(1:),'free boundary').NE.0 ) THEN
            ITYP(IEQW) = 22
-        ELSEIF( INDEX(BDUM(1)(1:),'poten').NE.0 .AND. &
-        INDEX(BDUM(1)(1:),'evap').NE.0 ) THEN
-           ITYP(IEQW) = 24
+        ELSEIF(( INDEX(BDUM(1)(1:),'poten').NE.0 .AND. &
+                 INDEX(BDUM(1)(1:),'evap').NE.0 ) .OR. &
+                 (INDEX(BDUM(1)(1:),'pet').NE.0)) THEN
+           CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,PNAME)
+           DO IP = 1, NPLANT
+             IF (PNAME==PLANT(IP)) THEN
+                IPFTX = IP
+             ENDIF
+           ENDDO
+!           CALL RDINT(ISTART,ICOMMA,CHDUM,IPFTX)
+           ITYP(IEQW) = 24*1000 + IPFTX
         ELSE
           INDX = 4
           CHMSG = 'Unrecognized Boundary Condition: '//BDUM(1)
@@ -707,7 +718,16 @@ end interface
 !---    Write boundary condition type(s) ---
 !
         if(me.eq.0) WRITE(IWR,'(A,$)') 'Boundary Condition Type: '
-        if(me.eq.0) WRITE(IWR,'(2X,2A)') CHTYP(ITYP(IEQW)),' Aqueous'
+        if (ITYP(IEQW)<24000) then
+          if(me.eq.0) WRITE(IWR,'(2X,2A)') CHTYP(ITYP(IEQW)),' Aqueous'
+          !print *, "IEQW=", IEQW, "ITYP(IEQW)=",ITYP(IEQW),&
+          !  "CHTYP(ITYP(IEQW))=", CHTYP(ITYP(IEQW))
+        else
+          if(me.eq.0) WRITE(IWR,'(2X,2A)') CHTYP(24),' Aqueous'
+          if(me.eq.0) WRITE(IWR,'(A,A)') 'Plant name: ',PLANT(ITYP(IEQW)-24000)
+          !print *, "IEQW=", IEQW, "ITYP(IEQW)=",ITYP(IEQW),&
+          !  "CHTYP(ITYP(IEQW))=", CHTYP(24)
+        endif
 !
 !---    Write solute boundary condition type(s) ---
 !
@@ -788,6 +808,8 @@ end interface
         BCTMO = -SMALL
         if(me.eq.0) &
         WRITE(IWR,'(A)') 'Boundary Condition Times and Variables:'
+
+
         DO 100 NTM = 1,IBCMX
           DO 40 M = 1,LBCV
             VAR(NTM,M) = 0.D+0
@@ -799,227 +821,291 @@ end interface
           T_OK = BUFFEREDREAD_GETLINE(CHDUM)
           CALL LCASE( CHDUM )
           ISTART = 1
-          VARB = 'Boundary Time'
-          CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,1))
-          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-          if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
-          ': ',VAR(NTM,1)
-          INDX = 0
-          IUNS = 1
-          CALL RDUNIT(UNTS,VAR(NTM,1),INDX)
-          if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,1),', s)'
-          IF( ITYP(IEQW).EQ.1 ) THEN
-            VARB = 'Aqueous Pressure, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+          CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,TMP)
+          if (INDEX(TMP(1:),'file') /= 0) then
+            if (ITYP(IEQW)>24000) then
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              NCH = INDEX(FDUM,'  ')-1
+              IF (ME .EQ. 0) THEN
+                T_OK = OPENFILE( FDUM(1:NCH),IUNIT,0 )
+                ! loop through each line of the external file
+                DO ILINE = 1,IBCMX
+                  READ(IUNIT,'(4A)') CHDUM !time,time_unit,pet,pet_unit 
+                  VARB = 'Boundary Time'
+                  ISTART = 1
+                  CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(ILINE,1))
+                  CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                  if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),',',UNTS(1:NCH), &
+                    ': ',VAR(ILINE,1)
+                  INDX = 0
+                  IUNS = 1
+                  CALL RDUNIT(UNTS,VAR(ILINE,1),INDX)
+                  if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(ILINE,1),', s)'
+                  VARB = 'Potential Evapotranspiration Rate'
+                  if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
+                  ISX = ISTART
+                  ICX = ICOMMA
+                  CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+                  ISTART = ISX
+                  ICOMMA = ICX
+                  CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(ILINE,2))
+                  CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                  if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(ILINE,2)
+                  INDX = 0
+                  IUNM = 1
+                  IUNS = -1
+                  CALL RDUNIT(UNTS,VAR(ILINE,2),INDX)
+                  if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(ILINE,2),', m/s)'
+                ENDDO
+              ENDIF
+              allocate(var_tmp(IBCMX))
+              do il = 1,2
+                var_tmp(1:IBCMX) = 0.0
+                if (me==0) var_tmp(1:IBCMX) = VAR(1:IBCMX,il)
+                call ga_dgop(10,var_tmp, IBCMX, 'max')
+                if (ME .NE. 0) VAR(1:IBCMX,il) = var_tmp
+              enddo
+              deallocate(var_tmp)
+!              CALL MPI_BCAST(VAR,2*IBCMX,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
+              GO TO 101
+            else
+              IF (ME .EQ. 0) THEN
+                WRITE(IWR,*) "ERROR: Read external boundary condition time file" 
+                WRITE(IWR,*) "       is only available for PET calculation. "
+                WRITE(ISC,*) "ERROR: Read external boundary condition time file"
+                WRITE(ISC,*) "       is only available for PET calculation. "
+              ENDIF
+              STOP
+            endif
+          else
+            ISTART = 1
+            VARB = 'Boundary Time'
+            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,1))         
             CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-          ELSEIF( ITYP(IEQW).EQ.2 ) THEN
-            VARB = 'Volumetric Aqueous Flux, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = 1
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', m^3/s)'
-          ELSEIF( ITYP(IEQW).EQ.3 ) THEN
-            VARB = 'Aqueous Pressure'
-            if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-          ELSEIF( ITYP(IEQW).EQ.7 ) THEN
-            VARB = 'Aqueous Pressure'
-            if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-          ELSEIF( ITYP(IEQW).EQ.11 ) THEN
-            VARB = 'Base Aqueous Pressure, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-          ELSEIF( ITYP(IEQW).EQ.12 ) THEN
-            VARB = 'Dummy Variable, '
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-          ELSEIF( ITYP(IEQW).EQ.17 ) THEN
-            VARB = 'Base Aqueous Pressure, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
+            if(me.eq.0) WRITE(IWR,'(2X,4A,1PE11.4,$)') VARB(1:IVR),', ',UNTS(1:NCH), &
+            ': ',VAR(NTM,1)
+            NDX = 0
+            IUNS = 1
+            CALL RDUNIT(UNTS,VAR(NTM,1),INDX)
+            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,1),', s)'
+            IF( ITYP(IEQW).EQ.1 ) THEN
+              VARB = 'Aqueous Pressure, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+            ELSEIF( ITYP(IEQW).EQ.2 ) THEN
+              VARB = 'Volumetric Aqueous Flux, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = 1
+              IUNS = -1
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', m^3/s)'
+            ELSEIF( ITYP(IEQW).EQ.3 ) THEN
+              VARB = 'Aqueous Pressure'
+              if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+            ELSEIF( ITYP(IEQW).EQ.7 ) THEN
+              VARB = 'Aqueous Pressure'
+              if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+            ELSEIF( ITYP(IEQW).EQ.11 ) THEN
+              VARB = 'Base Aqueous Pressure, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+            ELSEIF( ITYP(IEQW).EQ.12 ) THEN
+              VARB = 'Dummy Variable, '
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+            ELSEIF( ITYP(IEQW).EQ.17 ) THEN
+              VARB = 'Base Aqueous Pressure, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+              INDX = 0
+              IUNM = -1
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
 !
 !---      Aqueous potential evaporation  ---
 !
-          ELSEIF( ITYP(IEQW).EQ.24 ) THEN
-            VARB = 'Potential Evaporation Rate'
-            if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = 1
-            IUNS = -1
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', m/s)'
-            VARB = 'Maximum Capillary Head'
-            if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,3)
-            INDX = 0
-            IUNM = 1
-            CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', m)'
-!
+!          ELSEIF( ITYP(IEQW).EQ.24 ) THEN
+            ELSEIF( ITYP(IEQW).EQ.24 .or. ityp(ieqw)>24000) THEN
+              if (lplant >0) then
+                VARB = 'Potential Evapotranspiration Rate'
+                if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
+                ISX = ISTART
+                ICX = ICOMMA
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+                ISTART = ISX
+                ICOMMA = ICX
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
+                INDX = 0
+                IUNM = 1
+                IUNS = -1
+                CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+                if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', m/s)'
+              else
+                VARB = 'Maximum Capillary Head'
+                if(me.eq.0) WRITE(IWR,'(2X,2A,$)') VARB(1:IVR),', '
+                ISX = ISTART
+                ICX = ICOMMA
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+                ISTART = ISX
+                ICOMMA = ICX
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,3))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,3)
+                INDX = 0
+                IUNM = 1
+                CALL RDUNIT(UNTS,VAR(NTM,3),INDX)
+                if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,3),', m)'
+              endif
+! 
 !---      X-Y-Z Hydraulic gradient 
 !
-          ELSEIF( ITYP(IEQW).EQ.44 ) THEN
-            VARB = 'Base Aqueous Pressure, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-            DO 44 I = 1,3
-              CALL RDDPR(ISTART,ICOMMA,CHDUM,BCXYZG(NTM,I))
+            ELSEIF( ITYP(IEQW).EQ.44 ) THEN
+              VARB = 'Base Aqueous Pressure, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
               CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-              if(me.eq.0) WRITE(IWR,'(2X,4A,2PE11.4,$)') CHLB(I),', ', &
-              UNTS(1:NCH),': ',BCXYZG(NTM,I)
+              if(me.eq.0) WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
               INDX = 0
               IUNM = -1
-              CALL RDUNIT( UNTS,BCXYZG(NTM,I),INDX )
-              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',BCXYZG(NTM,I),', 1/m)'
-   44       CONTINUE
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
+              if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+              DO 44 I = 1,3
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,BCXYZG(NTM,I))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) WRITE(IWR,'(2X,4A,2PE11.4,$)') CHLB(I),', ', &
+                UNTS(1:NCH),': ',BCXYZG(NTM,I)
+                INDX = 0
+                IUNM = -1
+                CALL RDUNIT( UNTS,BCXYZG(NTM,I),INDX )
+                if(me.eq.0) WRITE(IWR,'(A,1PE11.4,A)') ' (',BCXYZG(NTM,I),', 1/m)'
+   44         CONTINUE
 !
 !---      X-Y-Z Seepage face
 !
-          ELSEIF( ITYP(IEQW).EQ.45 ) THEN
-            VARB = 'Base Aqueous Pressure, '
-            if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
-            ISX = ISTART
-            ICX = ICOMMA
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
-            ISTART = ISX
-            ICOMMA = ICX
-            CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            if(me.eq.0) &
-            WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
-            INDX = 0
-            IUNM = -1
-            IUNKG = 1
-            IUNS = -2
-            CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
-            if(me.eq.0) &
-             WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
-            VAR(NTM,2) = VAR(NTM,2) - PATM
-            DO 45 I = 1,3
-              CALL RDDPR(ISTART,ICOMMA,CHDUM,BCXYZG(NTM,I))
+            ELSEIF( ITYP(IEQW).EQ.45 ) THEN
+              VARB = 'Base Aqueous Pressure, '
+              if(me.eq.0) WRITE(IWR,'(2X,A,$)') VARB(1:IVR)
+              ISX = ISTART
+              ICX = ICOMMA
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
+              ISTART = ISX
+              ICOMMA = ICX
+              CALL RDDPR(ISTART,ICOMMA,CHDUM,VAR(NTM,2))
               CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-              if(me.eq.0) WRITE(IWR,'(2X,4A,2PE11.4,$)') CHLB(I),', ', &
-              UNTS(1:NCH),': ',BCXYZG(NTM,I)
+              if(me.eq.0) &
+              WRITE(IWR,'(2A,1PE11.4,$)') UNTS(1:NCH),': ',VAR(NTM,2)
               INDX = 0
               IUNM = -1
-              CALL RDUNIT( UNTS,BCXYZG(NTM,I),INDX )
+              IUNKG = 1
+              IUNS = -2
+              CALL RDUNIT(UNTS,VAR(NTM,2),INDX)
               if(me.eq.0) &
-              WRITE(IWR,'(A,1PE11.4,A)') ' (',BCXYZG(NTM,I),', 1/m)'
-   45       CONTINUE
-          ELSE
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-            CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
-          ENDIF
+                WRITE(IWR,'(A,1PE11.4,A)') ' (',VAR(NTM,2),', Pa)'
+              VAR(NTM,2) = VAR(NTM,2) - PATM
+              DO 45 I = 1,3
+                CALL RDDPR(ISTART,ICOMMA,CHDUM,BCXYZG(NTM,I))
+                CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+                if(me.eq.0) WRITE(IWR,'(2X,4A,2PE11.4,$)') CHLB(I),', ', &
+                UNTS(1:NCH),': ',BCXYZG(NTM,I)
+                INDX = 0
+                IUNM = -1
+                CALL RDUNIT( UNTS,BCXYZG(NTM,I),INDX )
+                if(me.eq.0) &
+                WRITE(IWR,'(A,1PE11.4,A)') ' (',BCXYZG(NTM,I),', 1/m)'
+   45         CONTINUE
+            ELSE
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+              CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,UNTS)
+            ENDIF
+          endif
+
           IF( IEQC.GT.0 ) THEN
             DO 50 NSL = 1,NSOLU
               IF( ITYP(NSL+LUK).EQ.1 .OR. ITYP(NSL+LUK).EQ.19 ) THEN
@@ -1175,6 +1261,7 @@ end interface
           ENDIF
           BCTMO = VAR(NTM,1)
   100   CONTINUE
+  101   CONTINUE
 !
 !---    Assign values to boundary variables  ---
 !
@@ -1631,6 +1718,7 @@ time3x = 0.d0
         else
 !         idx = i_id(abs(icntx))
          idx = abs(icntx)
+!         print*, "i,icntx,idx:",i,icntx,abs(icntx)
          if(ibcd_(i).eq.-1) then
            jcnx = nd2cnx(1,idx)
            if(jcnx.eq.0) then
@@ -1686,14 +1774,11 @@ time3x = 0.d0
              nd2cnx(6,idx) = -i
            endif
          endif
-!if(idx.eq.119630) print *,'goto nzf-',nx,nd2cnx(:,idx)
          xarea = areac(jcnx)
          b_area_%p(i) = xarea
-!         call parse_id(i_id(idx),ixx,iyy,izz)
          b_id_%p(i) = idx
          ibcdx = ibcd_(i)
          if(abs(ibcdx).eq.1) then
-!           b_dist_%p(i) = 0.5d0*(x(ixx)+x(ixx+1))
            b_dist_%p(i) = xdist
            if(ibcdx.eq.1) then
              b_dx_%p(i) = 1.d0
@@ -1705,7 +1790,6 @@ time3x = 0.d0
              b_dz_%p(i) = 0.d0
            endif
          elseif(abs(ibcdx).eq.2) then
-!           b_dist_%p(i) = 0.5d0*(y(iyy)+y(iyy+1))
            b_dist_%p(i) = xdist
            if(ibcdx.eq.2) then
              b_dx_%p(i) = 0.d0
@@ -1717,7 +1801,6 @@ time3x = 0.d0
              b_dz_%p(i) = 0.d0
            endif
          elseif(abs(ibcdx).eq.3) then
-!           b_dist_%p(i) = 0.5d0*(z(izz)+z(izz+1))
            b_dist_%p(i) = xdist
            if(ibcdx.eq.3) then
              b_dx_%p(i) = 0.d0
@@ -1770,9 +1853,7 @@ time3x = 0.d0
      call delete_bcnx_field('pgb',t_ok)
      call delete_bcnx_field('q_flux_b',t_ok)
 !BH
-!     write(*,*) '0000, num_bcnx',num_bcnx
      num_bcnx = newnumx
-!    write(*,*) '1111, num_bcnx',num_bcnx
 !---  reallocate variables for boundary conditions
 !
     if(num_bcnx.ne.0) then
@@ -1857,20 +1938,16 @@ time3x = 0.d0
      deallocate(bc_)
      if(allocated(new_bcnx)) deallocate(new_bcnx)
       rbase = 0
-!      if(me.eq.0) then
       do nb = 1, nlin
         call ga_igop(5,basen(nb),1,'max')
         if(basen(nb).gt.0) rbase = rbase+1
       enddo
-!      write(*,*) 'me,rbase',me,rbase
-!      endif
-!      call ga_igop(5,rbase,1,'+')
       allocate(base_node(rbase))
       base_node(1:rbase) = 0
       basex(1:rbase) = 0.d0
       basey(1:rbase) = 0.d0
-      basez(1:rbase) = 0.d0
-!      irefb = 0
+!      basez(1:rbase) = 0.d0
+      basez(1:rbase) = -99999.d0
       irfbx = 0
       do icx=1,num_bcnx
         irfbx = irefb(icx)
@@ -1897,9 +1974,7 @@ time3x = 0.d0
               basez(n_bx) = zp(nx) - b_dist_%p(icx)
             elseif(ibcd(icx).eq.3) then
               basez(n_bx) = zp(nx) + b_dist_%p(icx)
-!            print *,'goto rdbc base-',icx,nx,basex(n_bx),basey(n_bx),basez(n_bx)
             endif
-!            write(*,*) 'me,icx,basez',me, icx,basez(n_bx)
           endif       
 !          base_node(irfbx) = ibcn(icx)
         else
@@ -1934,7 +2009,6 @@ time3x = 0.d0
        elseif(nd2cnx(6,nx).eq.0.and.ibcd(icx).eq.3) then
          nd2cnx(6,nx) = -icx
        endif
-!if(nx.eq.119630) print *,'goto zf1-',nx,nd2cnx(:,nx)
      enddo
 !find internal zero flux b/c of inactive nodes
      do icx=1,num_cnx
@@ -2085,15 +2159,98 @@ time3x = 0.d0
        elseif(nd2cnx(6,nx).eq.0) then
          nd2cnx(6,nx) = -icx
        endif
-!if(nx.eq.119630) print *,'goto zf-',nx,nd2cnx(:,nx)
      enddo
-!  t_e3 = MPI_Wtime()
-!time3x=t_e3-t_b3
-!stop
-!     do i=1,num_bcnx
-!      print *,'goto rdbc-b',i,ibcn(i),ibcd(i),ibct(1,i),ibcin(i)
-!     enddo
-!     stop
+     if(lplant == 1) then
+       call add_bcnx_ifield('ibpft',idx)
+       ibpft => i_bcnx_fld(idx)%p
+       ibpft = 0
+       call add_node_dfield('root_fr', idx)
+       root_fr => d_nd_fld(idx)%p
+       root_fr = 0.d0
+       dim1 = lsv
+       call add_node_d2field('wilt_factor', dim1, idx)
+       wiltf => d_nd_2fld(idx)%p
+       wiltf = 0.d0
+       call add_node_d2field('veg_sink', dim1, idx)
+       veg_sink => d_nd_2fld(idx)%p
+       veg_sink = 0.d0
+       call add_node_d2field('evap_trans', dim1, idx)
+       evap_trans => d_nd_2fld(idx)%p
+       evap_trans = 0.d0
+       allocate(veg_varx(4,ldx*ldy))
+       veg_varx = 0.d0
+       allocate(veg_bc(ldx*ldy))
+       veg_bc = 0.d0
+       allocate(crf(ldx*ldy))
+       crf = 0.d0
+!
+       do i=1,num_bcnx
+         if(ibct(ieqw,i) > 24000) then
+           nx  = ibcn(i)
+           zsurf = zp(nx) + b_dist_%p(i)
+           ibpft(i) = ibct(ieqw,i) - 24000
+           ibct(ieqw,i) = 24
+           call parse_id_local(nx,ix_x,iy_x,iz_x)
+           lndx = ix_x + (iy_x-1)*ldx
+           veg_varx(1,lndx) = zsurf
+           veg_varx(2,lndx) = ix_x
+           veg_varx(3,lndx) = iy_x
+           veg_varx(4,lndx) = ibpft(i)
+         endif
+       enddo
+       do lndx = 1,ldx*ldy
+         if(veg_varx(2,lndx) > 0.d0) then
+           zsurf = veg_varx(1,lndx)
+           ix = int(veg_varx(2,lndx))
+           iy = int(veg_varx(3,lndx))
+           pft = int(veg_varx(4,lndx))
+           do izz = 1, ldz
+             ndx = ix + (iy-1)*ldx + (izz-1) * ldx * ldy
+             if(id_g2l(ndx) > 0 .and. ixp(ndx)>0) then
+               if ((rsd_p(1,pft) == 0.d0) .or. &
+                  ((rsd_p(1,pft) > 0.d0).and. &
+                      ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
+                 z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
+                 z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
+                 if(z_up >= 0.0 .and. z_bt >=0.0) then
+                    if (IPLF_P(pft) == 3 .or. IPLF_P(pft) == 4) then
+                      call zeng(pft,z_up,z_bt,root_fr(ndx))
+                      crf(lndx) = crf(lndx) + root_fr(ndx)
+                    endif
+                 endif
+               endif
+             endif
+           enddo
+         endif
+       enddo
+       do lndx = 1,ldx*ldy
+         if(veg_varx(2,lndx) > 0.d0) then
+           zsurf = veg_varx(1,lndx)
+           ix = int(veg_varx(2,lndx))
+           iy = int(veg_varx(3,lndx))
+           pft = int(veg_varx(4,lndx))
+           if (IPLF_P(pft) == 4) then
+             do izz = 1, ldz
+               ndx = ix + (iy-1)*ldx + (izz-1) * ldx * ldy
+               if(id_g2l(ndx) > 0 .and. ixp(ndx)>0) then
+                 if ((rsd_p(1,pft) == 0.d0) .or. &
+                    ((rsd_p(1,pft) > 0.d0).and. &
+                      ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
+                    z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
+                    z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
+                    if (z_up >= 0.0 .and. z_bt >=0.0) then
+                      root_fr(ndx) = root_fr(ndx)*rsd_p(4,pft)/crf(lndx)
+                    endif
+                 endif
+               endif
+             enddo
+           endif
+         endif
+       enddo
+
+
+ 
+     endif
      ICSN = ICSN-ICSNX
      SUBNM = SUBNM(1:ICSN)
 !
@@ -2126,3 +2283,16 @@ subroutine locate(xx,n,x,j)
  return
 end subroutine locate
 
+subroutine parse_id_local(it,ix,iy,iz)
+  use grid_mod
+  implicit none
+  integer i, it, ix, iy, iz
+  i = it - 1
+  ix = mod(i,ldx)
+  i = (i-ix)/ldx
+  iy = mod(i,ldy)
+  iz = (i-iy)/ldy
+  ix = ix + 1
+  iy = iy + 1
+  iz = iz + 1
+end subroutine parse_id_local

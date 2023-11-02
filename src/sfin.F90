@@ -76,6 +76,7 @@
 !  49   gas-diffusive gas-component mass flux
 !  50   total-advective gas-component mass flux
 !  51   total-diffusive gas-component mass flux
+!  52   surface evapotranspiration
 ! 101 to 100+NSOLU
 !       solute flux - UC, VC, WC
 ! 101+NSOLU to 100+NSOLU+NEQC   
@@ -124,6 +125,7 @@
 ! use bcvs
   use grid_mod
   USE REACT
+  USE PLT_ATM
 !
   
 !----------------------Implicit Double Precision-----------------------!
@@ -153,6 +155,11 @@
 !
   INTEGER NCX(LSF),ISFCX(6)
   LOGICAL IFLAG
+  REAL*8:: idr(3),max_idr
+  integer:: id_max
+  integer:: vx_ceil,vy_ceil,vz_ceil
+  REAL*8::et_fx,area_tmp
+  real*8, dimension(:), allocatable::area_et(:)
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -436,6 +443,10 @@
           if(me.eq.0) WRITE(ISF(NSG),'(6A)') 'Total-Diffusive ' //  &
             GCNM(IGC)(1:NCH0) // '-Mass Flux',',', &
             UNSF(1,NS)(1:NCH1),',',UNSF(2,NS)(1:NCH2),','
+!ET-BH
+        ELSEIF( ISFT(NS).EQ.52 ) THEN
+          if(me.eq.0) WRITE(ISF(NSG),'(5A)') 'Surface actual evapotranspiration,', &
+            UNSF(1,NS)(1:NCH1),',',UNSF(2,NS)(1:NCH2),','
         ELSEIF( ISFT(NS).GT.100 .AND. ISFT(NS).LE.(100+NSOLU) ) THEN
           NSL = ISFT(NS)-100
           NCH = INDEX(SOLUT(NSL),'  ')-1
@@ -496,7 +507,7 @@
         ENDIF
         I = MIN( ABS(ISFT(NS)),100 )            
         J = ABS( ISFD(NS) )
-        IF( ISFD(NS).EQ.4 ) J = 1
+        IF( ISFD(NS).EQ.4 .OR. ISFT(NS).EQ.52) J = 1
         IF( NS.EQ.NSF .OR. NCSX.EQ.ISFGP(NSG) ) THEN
           if(me.eq.0) WRITE(ISF(NSG),9002) CHSF(I,J)//'R','(',NS,')  '
           if(me.eq.0) WRITE(ISF(NSG),9012) CHSF(I,J)//'I','(',NS,')  '
@@ -526,6 +537,8 @@
 !
 !---  Loop over the defined surfaces  ---
 !
+  allocate(area_et(nsf))
+  area_et = 0.0
   DO 7000 NS = 1,NSF
     SF(1,NS) = 0.D+0
 !    IF( ISFD(NS).EQ.4 ) THEN
@@ -533,6 +546,7 @@
 !    ELSE
       NSFDOMX = 1
 !    ENDIF
+!    write(*,*) 'NS: ', NS
     DO 6900 NC = 1,NSFDOMX
 !    IF( ISFD(NS).EQ.4 ) THEN
 !      ISFDX = ISFDOM(4,NC,NS)
@@ -555,9 +569,15 @@
      v_x = 0.D+0
      v_y = 0.D+0
      v_z = 0.D+0
+     area_et(ns) = 0.D+0
      do nx = 1, num_loc_nodes
        n = id_l2g(nx)
        if(ixp(n) == 0.or.isfc(ns,n)<=0) cycle
+!       write(*,*) 'nx,n:',nx,n
+       if (isft(ns)==52) then
+          et_fx = evap_trans(2,n) * dxgf(n) * dygf(n)  ! m/s*m*m
+          area_et(ns) = area_et(ns) + dxgf(n) * dygf(n)
+       endif
        do ifcx = 1,6
 !            NPZ = NSZ(N)
          icnx = nd2cnx(ifcx,n)
@@ -579,12 +599,32 @@
            endif
          endif
          isfdx = isfd(ns)
-         if(abs(v_x*isfdx) == 1.d0 .or. abs(v_y*isfdx) == 2.d0 .or. abs(v_z*isfdx) == 3.d0) then
-!         if(abs(isfdx) == 1.d0 .or. abs(isfdx) == 2.d0 .or. abs(isfdx) == 3.d0) then
+!         write(*,*) 'vx*isfdx,vy*isfdx,vz*isfdx: ',v_x*isfdx,v_y*isfdx,v_z*isfdx
+!BH account for bfg
+         if (ics.ne.3 .and. ics .ne. 8) then
+            if(abs(v_x*isfdx) == 1.d0 .or. abs(v_y*isfdx) == 2.d0 .or. abs(v_z*isfdx) == 3.d0) then
+               go to 9000
+            else
+               go to 9100
+            endif
+         else
+            vx_ceil = ceiling(abs(v_x*isfdx))
+            vy_ceil = ceiling(abs(v_y*isfdx))
+            vz_ceil = ceiling(abs(v_z*isfdx))
+!            write(*,*) 'vx_ceil,vy_ceil,vz_ceil:',vx_ceil,vy_ceil,vz_ceil
+            if(vx_ceil == 1 .or. vy_ceil == 2 .or. vz_ceil == 3) then       
+                go to 9000
+            else
+                go to 9100
+            endif
+         endif
+!BH
+         9000 continue         
          q_fx = 0.0d0
          c_fx = 0.0d0
          icnx = nd2cnx(ifcx,n)
 !         print *, 'icnx: ',icnx
+!         write(*,*) 'nx,n,ifcx,icnx:',nx,n,ifcx,icnx
          if(icnx > 0) then
             areaxx = areac(icnx)
             id_up = conn_up(icnx)
@@ -593,11 +633,36 @@
             if(n.eq.id_up .and. isfdx > 0) cycle
 !            q_fx = q_flux(1,icnx)
             idirx = abs(isfdx)
+!            write(*,*) 'isfdx: ',isfdx,' idirx: ',idirx
             if(isfdx > 0 ) then
                 q_fx = q_flux_nd(idirx,id_up)
             else
                 q_fx = q_flux_nd(idirx,id_up)
             endif
+            if (ics.eq.3 .or. ics .eq. 8) then  
+               if (vx_ceil == 1) then
+                 q_fx = sqrt(v_x**2/(v_x**2+v_y**2+v_z**2))*q_fx
+               else if (vy_ceil == 2) then
+                 q_fx = sqrt(v_y**2/(v_x**2+v_y**2+v_z**2))*q_fx
+! Fluxes from horizontal directions are dominant
+! Top and bottom faces are not fixed yet. -BH
+!               else if (vz_ceil == 3) then
+!                 qx = q_flux_nd(1,id_up)
+!                 qy = q_flux_nd(2,id_up)
+!                 qz = q_flux_nd(3,id_up)
+!                 do ifcx_z = 1,4
+!                    icnx_z = nd2cnx(ifcx_z,n)
+!                    if (icnx_z>0) then
+!                      v_tmp(1) = unvxc(icnx_z)
+!                      v_tmp(2) = unvyc(icnx_z)
+!                      v_tmp(3) = unvzc(icnx_z)
+!                      if
+!                      qz = qz+sqrt(v_z**2/(v_x**2+v_y**2+v_z**2))*qx + &
+!                         sqrt(v_y**2/(v_x**2+v_y**2+v_z**2))*qy
+               endif
+            endif          
+!            write(*,*) 'q_fx:',q_fx
+!            write(*,*) 'isft:',isft(ns)
             if( isft(ns).gt.100 .and.  &
                isft(ns).le.(100+nsolu) ) then
               nsl = isft(ns)-100
@@ -606,6 +671,7 @@
               else
                 c_fx = c_flux_nd(idirx,nsl,id_up)
               endif
+!              write(*,*) '0 c_fx:',c_fx
             elseif (isft(ns).gt.(100+nsolu) .and. &
               isft(ns).le.(100+nsolu+neqc+neqk)) then
               nsl = isft(ns)-100
@@ -614,6 +680,7 @@
               else
                 c_fx = c_flux_nd(idirx,nsl,id_up)
               endif
+!              write(*,*) '1 c_fx:',c_fx
             endif
             if(q_fx > 0.d0) then
               rholx = rhol(2,id_dn)
@@ -692,7 +759,9 @@
             ELSEIF( ISFT(NS).EQ.10 ) THEN
 
               sfx = q_fx*areaxx*rholx*xlwx + (dgw_fx-dla_fx)*areaxx*wtmw
-
+! ET-BH
+            ELSEIF( ISFT(NS).EQ.52 ) THEN
+              sfx = et_fx 
 !
 !---            Gas-CH4 Mass Flux  ---
 !
@@ -826,15 +895,21 @@
               sfx = areaxx*c_fx*1.d-3
             ENDIF
             RSFDX = REAL(ISFDX)
-            SF(1,NS) = SF(1,NS)+SFX*SIGN(1.D+0,RSFDX)/(TLTZX+SMALL)
+            IF (ISFT(NS) .NE. 52) THEN
+              SF(1,NS) = SF(1,NS)+SFX*SIGN(1.D+0,RSFDX)/(TLTZX+SMALL)
+            ENDIF
 !   1400         CONTINUE
 !   1500       CONTINUE
 !   1600     CONTINUE
-        endif
+!        endif
+       9100 continue
       enddo
+      IF (ISFT(NS)==52) THEN
+         SF(1,NS) = SF(1,NS)+SFX
+      ENDIF
     enddo
    6900 CONTINUE
-  SF(2,NS) = SF(2,NS) + SF(1,NS)*DT
+   SF(2,NS) = SF(2,NS) + SF(1,NS)*DT
    7000 CONTINUE
   VAR = TM
   IF( UNTM.NE.'null' ) THEN
@@ -858,6 +933,11 @@
   DO 8000 NS = 1,NSF
     VAR = SF(1,NS)
     call ga_dgop(1,var,1,'+')
+    if (isft(ns)==52) then
+      area_tmp = area_et(ns)
+      call ga_dgop(1,area_tmp,1,'+')
+      VAR = VAR/(area_tmp+small)
+    endif
     IF( UNSF(1,NS).NE.'null' ) THEN
       INDX = 1
       IF( ISFT(NS).EQ.1 ) THEN
@@ -977,6 +1057,9 @@
       ELSEIF( ISFT(NS).EQ.45 ) THEN
         IUNKG = 1
         IUNS = -1
+      ELSEIF( ISFT(NS).EQ.52 ) THEN
+        IUNM = 1
+        IUNS = -1
 !
 !---      Aqueous-advective, aqueous-diffusive, gas-advective, 
 !         gas-diffusive, total-advective, and total-diffusive
@@ -1014,6 +1097,11 @@
    7800   CONTINUE
     VAR = SF(2,NS)
     call ga_dgop(1,var,1,'+')
+    if (isft(ns)==52) then
+      area_tmp = area_et(ns)
+      call ga_dgop(1,area_tmp,1,'+')
+      VAR = VAR/(area_tmp+small)
+    endif
     IF( UNSF(2,NS).NE.'null' ) THEN
       INDX = 1
       IF( ISFT(NS).EQ.1 ) THEN
@@ -1102,6 +1190,8 @@
         IUNKG = 1
       ELSEIF( ISFT(NS).EQ.45 ) THEN
         IUNKG = 1
+      ELSEIF( ISFT(NS).EQ.52 ) THEN
+        IUNM = 1
 !
 !---      Aqueous-advective, aqueous-diffusive, gas-advective, 
 !         gas-diffusive, total-advective, and total-diffusive
@@ -1147,6 +1237,7 @@
    7900   CONTINUE
    8000 CONTINUE
   IHSF = IHSF + 1
+  deallocate(area_et) 
 !
 !---  Format Statements  ---
 !

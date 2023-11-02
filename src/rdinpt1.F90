@@ -12,6 +12,7 @@
       USE REACT
       USE TRNSPT
       USE BUFFEREDREAD
+      USE COUP_WELL
 !
 !----------------------Implicit Double Precision-----------------------!
 !
@@ -352,6 +353,16 @@
         ENDIF
       ENDIF
 !
+!---  Search input file for plant properties card --
+!
+      IF( BUFFEREDREAD_FIND( '~plant properties' ) )THEN
+        CALL RDPLANT
+      ELSE
+        INDX = 1
+        CHMSG = 'Missing Plant Properties Card'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+      ENDIF
+!
 !---  Search input file for boundary conditions card --
 !
       IF( BUFFEREDREAD_FIND( '~boundary' ) )THEN
@@ -393,6 +404,16 @@
       ELSE
         INDX = 1
         CHMSG = 'Missing Surface Flux Card'
+        IF( ME.EQ.0 ) CALL WRMSGS( INDX )
+      ENDIF
+!
+!---  Search input file for coupled well card --
+!
+      IF( BUFFEREDREAD_FIND( '~coupled well' ) )THEN
+        CALL RDCOUP_WELL
+      ELSE
+        INDX = 1
+        CHMSG = 'Missing Coupled Well Card'
         IF( ME.EQ.0 ) CALL WRMSGS( INDX )
       ENDIF
 !

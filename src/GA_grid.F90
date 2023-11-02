@@ -151,12 +151,12 @@ subroutine grid_init
 !  dims(1) = 3200
 !  dims(2) = 3200
 !  dims(3) = 15
-  upx = 0
-  upy = 0
-  upz = 0
-  call ga_igop(5,upx,1,'+')
-  call ga_igop(6,upy,1,'+')
-  call ga_igop(7,upz,1,'+')
+!  upx = 0
+!  upy = 0
+!  upz = 0
+!  call ga_igop(5,upx,1,'+')
+!  call ga_igop(6,upy,1,'+')
+!  call ga_igop(7,upz,1,'+')
   nxyz = (nxdim+1)*(nydim+1)*(nzdim+1)
   if(upx > 0) then
    IF ( PNUM.NE.(UPX*UPY*UPZ) )THEN
@@ -253,7 +253,7 @@ subroutine grid_init
   ldy = iaymax - iaymin + 1
   ldz = iazmax - iazmin + 1
 114 format(i4,' ',a6,': ',i4)
- write(*,'(a,4(I3,X))') 'me,ldx,ldy,ldz',me,ldx,ldy,ldz
+! write(*,'(a,4(I3,X))') 'me,ldx,ldy,ldz',me,ldx,ldy,ldz
 !
 !  Determine number of locally held nodes, etc.
 !
@@ -1046,6 +1046,7 @@ subroutine grid_init
   call add_cnx_dfield('tltx',idx)
   tltx => d_cnx_fld(idx)%p
   tltx = 0.d0
+!   print*, 'num_nodes:',num_nodes
    allocate(nd2cnx(6,num_nodes))
    nd2cnx = 0
 !
@@ -1811,17 +1812,18 @@ subroutine grid_init
 !--- E4D PATCH
 !  IF (.NOT.GAE4D) THEN
 !#endif
-    if(ics /= 8 .AND. ics /= 3 ) then !BH
-      if(allocated(x)) deallocate(x)
-      if(allocated(y)) deallocate(y)
-      if(allocated(z)) deallocate(z)
+!    if(ics /= 8 .AND. ics /= 3 ) then !BH
+!!!!!! Keep these variables for use in coupled well model - BH
+!      if(allocated(x)) deallocate(x)
+!      if(allocated(y)) deallocate(y)
+!      if(allocated(z)) deallocate(z)
 !#ifdef USE_E4D
-    else
+!   else
 !BH      if(allocated(xbf)) deallocate(xbf)
 !BH      if(allocated(ybf)) deallocate(ybf)
 !BH      if(allocated(zbf)) deallocate(zbf)
 !#endif
-    endif
+!    endif
 !        write(*,*) 'END GRID_INIT'
 !#ifdef USE_E4D
 !  ENDIF

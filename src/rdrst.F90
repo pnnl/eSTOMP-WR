@@ -59,6 +59,8 @@
       USE FDVP
       USE FDVH
       use grid_mod
+      USE COUP_WELL
+      USE SIO
 !
 
 !----------------------Implicit Double Precision-----------------------!
@@ -124,6 +126,7 @@
 !
 !---  Open the restart file  ---
 !
+      me = ga_nodeid()
       IF( INDX.EQ.1 ) THEN
         INQUIRE( FILE=FNRS, EXIST=EX )
 
@@ -236,6 +239,69 @@
           endif
         ENDIF
         deallocate(dvp)
+!***************Coupled well - Bryan*******************************
+!---    Coupled-well data  ---
+!
+#ifdef USE_H5HUT
+!        if(me.eq.0) print *,'n_cw',n_cw
+        if(n_cw > 0) then
+             allocate(p_cw_g(n_cw))
+             p_cw_g = -1.d20
+             n_cwx = 0
+             istat = ior(sio_read_scalar_int(h5file,"N_CW",N_CWX),istat)
+        DO NCW = 1,N_CWX
+!          WRITE(IRS,'(1PE22.15)') P_CW_G(NCW)
+          write(varname,"(A6,I1)") "P_CW_G",NCW
+          istat =ior(sio_read_scalar_dbl(h5file,varname,P_CW_G(NCW)),istat)
+        END DO
+        endif
+#else
+        if(me.eq.0) then
+!        write(*,*) 'me, n_cw:',me,n_cw
+        allocate(p_cw_g(n_cw))
+        p_cw_g = -1.d20
+        N_CWX = 0
+        READ(IRS,'(A)',end=900) CHDUM
+        IF( INDEX(CHDUM(1:),'Coupled-Well Model Data').NE.0 .AND. &
+         N_CW.GT.0 ) THEN
+          READ(IRS,'(I6)') N_CWX
+          DO 760 NCW = 1,N_CWX
+            READ(IRS,'(1PE22.15)') P_CW_G(NCW)
+  760     CONTINUE
+        ENDIF
+  900   CONTINUE
+        endif
+        call ga_igop(1,n_cwx,1,'max')
+        if(n_cwx /=0 ) then
+                call ga_dgop(1,p_cw_g,n_cwx,'+')
+        endif
+#endif
+!
+!---    Check for compatibility in number of coupled wells  ---
+!
+        IF( N_CW.GT.0 ) THEN
+!
+!---      Current simulation has more coupled wells than restart file,
+!         issue warning  ---
+!
+          IF( N_CWX.LT.N_CW ) THEN
+            INDX = 24
+            CHMSG = 'Number of Coupled Wells > ' //  &
+             'Number of Coupled Wells in Restart File'
+            IMSG = N_CWX
+            CALL WRMSGS( INDX )
+!
+!---      Current simulation has fewer coupled wells than restart file,
+!         issue error  ---
+!
+          ELSEIF( N_CWX.LT.N_CW ) THEN
+            INDX = 7
+            CHMSG = 'Number of Coupled Wells < ' // &
+             'Number of Coupled Wells in Restart File'
+            IMSG = N_CWX
+            CALL WRMSGS( INDX )
+          ENDIF
+        ENDIF
 !
 !---  Close the restart file  ---
 !
