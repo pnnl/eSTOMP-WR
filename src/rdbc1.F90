@@ -2212,12 +2212,13 @@ time3x = 0.d0
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
                  z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                  z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
-                 if(z_up >= 0.0 .and. z_bt >=0.0) then
+!                 if(z_up >= 0.0 .and. z_bt >=0.0) then
                     if (IPLF_P(pft) == 3 .or. IPLF_P(pft) == 4) then
+                      if (z_up<0.d0) z_up = 0.d0
                       call zeng(pft,z_up,z_bt,root_fr(ndx))
                       crf(lndx) = crf(lndx) + root_fr(ndx)
                     endif
-                 endif
+!                 endif
                endif
              endif
            enddo
@@ -2238,9 +2239,9 @@ time3x = 0.d0
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
                     z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                     z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
-                    if (z_up >= 0.0 .and. z_bt >=0.0) then
+!                    if (z_up >= 0.0 .and. z_bt >=0.0) then
                       root_fr(ndx) = root_fr(ndx)*rsd_p(4,pft)/crf(lndx)
-                    endif
+!                    endif
                  endif
                endif
              enddo

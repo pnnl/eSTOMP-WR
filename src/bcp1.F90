@@ -935,6 +935,7 @@
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then 
                       z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                       z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
+                      if (z_up<0.d0) z_up = 0.d0
                     if (IPLF_P(pft)>=3) then
                       smp = (pg(m,ndx)-pl(m,ndx))/rhol(m,ndx)/grav
                       call soil_stress (pft, smp, z_up, z_bt, wiltf(m,ndx))
