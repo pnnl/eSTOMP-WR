@@ -520,12 +520,7 @@ end interface
           KE = 0
           T_OK = RD_SPARSE_IJKV(FDUM(1:NCH),TEMP_F(1,1),LBC,4,KE)
           call ga_igop(22,ke,1,'max')
-<<<<<<< HEAD
-          do ii = 1,KE
-          enddo
-=======
             
->>>>>>> v523
         ENDIF
 !
 !---    Read boundary types  ---
@@ -1951,12 +1946,8 @@ time3x = 0.d0
       base_node(1:rbase) = 0
       basex(1:rbase) = 0.d0
       basey(1:rbase) = 0.d0
-<<<<<<< HEAD
-      basez(1:rbase) = 0.d0
-=======
 !      basez(1:rbase) = 0.d0
       basez(1:rbase) = -99999.d0
->>>>>>> v523
       irfbx = 0
       do icx=1,num_bcnx
         irfbx = irefb(icx)
@@ -2183,15 +2174,9 @@ time3x = 0.d0
        call add_node_d2field('veg_sink', dim1, idx)
        veg_sink => d_nd_2fld(idx)%p
        veg_sink = 0.d0
-<<<<<<< HEAD
-       call add_node_d2field('et', dim1, idx)
-       et => d_nd_2fld(idx)%p
-       et = 0.d0
-=======
        call add_node_d2field('evap_trans', dim1, idx)
        evap_trans => d_nd_2fld(idx)%p
        evap_trans = 0.d0
->>>>>>> v523
        allocate(veg_varx(4,ldx*ldy))
        veg_varx = 0.d0
        allocate(veg_bc(ldx*ldy))
@@ -2227,14 +2212,6 @@ time3x = 0.d0
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
                  z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                  z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
-<<<<<<< HEAD
-                 if(z_up >= 0.0 .and. z_bt >=0.0) then
-                    if (IPLF_P(pft) == 3 .or. IPLF_P(pft) == 4) then
-                      call zeng(pft,z_up,z_bt,root_fr(ndx))
-                      crf(lndx) = crf(lndx) + root_fr(ndx)
-                    endif
-                 endif
-=======
 !                 if(z_up >= 0.0 .and. z_bt >=0.0) then
                     if (IPLF_P(pft) == 3 .or. IPLF_P(pft) == 4) then
                       if (z_up<0.d0) z_up = 0.d0
@@ -2242,7 +2219,6 @@ time3x = 0.d0
                       crf(lndx) = crf(lndx) + root_fr(ndx)
                     endif
 !                 endif
->>>>>>> v523
                endif
              endif
            enddo
@@ -2261,19 +2237,11 @@ time3x = 0.d0
                  if ((rsd_p(1,pft) == 0.d0) .or. &
                     ((rsd_p(1,pft) > 0.d0).and. &
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then
-<<<<<<< HEAD
-                 z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
-                 z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
-                   if(z_up >= 0.0 .and. z_bt >=0.0) then
-                      root_fr(ndx) = root_fr(ndx)/crf(lndx)
-                   endif
-=======
                     z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                     z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
 !                    if (z_up >= 0.0 .and. z_bt >=0.0) then
                       root_fr(ndx) = root_fr(ndx)*rsd_p(4,pft)/crf(lndx)
 !                    endif
->>>>>>> v523
                  endif
                endif
              enddo

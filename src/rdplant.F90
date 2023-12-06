@@ -103,14 +103,9 @@
   CHARACTER*512 CHDUM
   INTEGER :: NCROPCX
   character(len=8) :: fmt,XIP ! format descriptor
-<<<<<<< HEAD
-  fmt = '(I1)' 
-!
-=======
   REAL*8::RSF ! root scaling factor
   fmt = '(I1)' 
 
->>>>>>> v523
 !----------------------Common Blocks-----------------------------------!
 !
   
@@ -145,11 +140,7 @@
  
   allocate(PLANT(NPLANT))
   allocate(PLF_P(5,NPLANT))
-<<<<<<< HEAD
-  allocate(RSD_P(3,NPLANT))
-=======
   allocate(RSD_P(4,NPLANT))
->>>>>>> v523
   allocate(IPLF_P(NPLANT))
   PLF_P = 0.0
   RSD_P = 0.0
@@ -191,9 +182,6 @@
      ELSEIF( INDEX(ADUM(1:),'zeng').NE.0 ) THEN
        IF ( INDEX(ADUM(1:),'scaling').NE.0 ) THEN
          IPLF_P(IP) = 4
-<<<<<<< HEAD
-         IF(ME==0) WRITE(IWR,'(A)') '  Zeng Root Stress Model with Scaling'
-=======
          NULL_ENTRY = 0
          CALL CHKDPR(ISTART,ICOMMA,CHDUM,INDX_RT)
 !         IF(ME==0) WRITE(IWR,'(A)') '  Zeng Root Stress Model with Scaling'
@@ -205,7 +193,6 @@
            RSD_P(4,IP) = RSF
            IF(ME==0) WRITE(IWR,'(A,F8.4)') '  Zeng Root Stress Model with Scaling Factor of ',RSF 
          ENDIF
->>>>>>> v523
        ELSE
          IPLF_P(IP) = 3
          IF(ME==0) WRITE(IWR,'(A)') '  Zeng Root Stress Model without Scaling'

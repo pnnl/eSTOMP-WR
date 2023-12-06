@@ -2204,11 +2204,7 @@
       INTEGER, DIMENSION(:), ALLOCATABLE :: veg_type
       REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: veg_varx
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  veg_sink
-<<<<<<< HEAD
-      REAL(KIND=DP), DIMENSION(:,:), pointer ::  et
-=======
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  evap_trans
->>>>>>> v523
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  wiltf
       REAL(KIND=DP), DIMENSION(:), pointer ::  root_fr
       INTEGER, DIMENSION(:), pointer ::  ibpft

@@ -158,11 +158,8 @@
   REAL*8:: idr(3),max_idr
   integer:: id_max
   integer:: vx_ceil,vy_ceil,vz_ceil
-<<<<<<< HEAD
-=======
   REAL*8::et_fx,area_tmp
   real*8, dimension(:), allocatable::area_et(:)
->>>>>>> v523
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -577,13 +574,10 @@
        n = id_l2g(nx)
        if(ixp(n) == 0.or.isfc(ns,n)<=0) cycle
 !       write(*,*) 'nx,n:',nx,n
-<<<<<<< HEAD
-=======
        if (isft(ns)==52) then
           et_fx = evap_trans(2,n) * dxgf(n) * dygf(n)  ! m/s*m*m
           area_et(ns) = area_et(ns) + dxgf(n) * dygf(n)
        endif
->>>>>>> v523
        do ifcx = 1,6
 !            NPZ = NSZ(N)
          icnx = nd2cnx(ifcx,n)
