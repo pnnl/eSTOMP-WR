@@ -80,6 +80,7 @@
 !      REAL*8 SCHRX(LSCHR)
       REAL*8 RKLX(3)
 !
+      REAL*8 ESLX,ESLX_2,ASLX
 !----------------------Executable Lines--------------------------------!
 !
       SUBNMX = '/KSP1'
@@ -94,26 +95,12 @@
       IF( ISCHR(IZN).EQ.1 ) THEN
         HDGL = MAX( (PGX-PLX)/RHORL/GRAV,1.D-14 )
 !
-!---    Two-pressure dual-porosity model  ---
+!---    Webb extension  ---
 !
-        IF( ABS(IDP(IZN)).EQ.1 ) THEN
-          CN = MAX( SCHR(6,IZN),SMALL )
-          IF( SCHR(15,IZN).LE.ZERO ) THEN
-            IF( MOD( IRPL(IZN),100 ).EQ.2 ) THEN
-              CM = 1.D+0 - 2.D+0/CN
-            ELSE
-              CM = 1.D+0 - 1.D+0/CN
-            ENDIF
-          ELSE
-            CM = SCHR(15,IZN)
-          ENDIF
-          SLP = (1.D+0/(1.D+0 + (SCHR(5,IZN)*HDGL)**CN))**CM
-          REALX = REAL(ISM(IZN))
-          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-          SMP = MAX( (1.D+0-HSCL)*SCHR(7,IZN),ZERO )
-        ELSE
+        IF( ISM(IZN).EQ.2 ) THEN
+          HMPX = SCHR(17,IZN)
           CN = MAX( SCHR(3,IZN),SMALL )
-          IF( SCHR(14,IZN).LE.ZERO ) THEN
+          IF( SCHR(14,IZN).LE.0.D+0 ) THEN
             IF( MOD( IRPL(IZN),100 ).EQ.2 ) THEN
               CM = 1.D+0 - 2.D+0/CN
             ELSE
@@ -122,48 +109,154 @@
           ELSE
             CM = SCHR(14,IZN)
           ENDIF
-          SLP = (1.D+0/(1.D+0 + (SCHR(1,IZN)*HDGL)**CN))**CM
-          REALX = REAL(ISM(IZN))
-          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-          SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
+          SRX = SCHR(4,IZN)
+!
+!---      Gas-aqueous capillary head above matching-point
+!         head, use Webb extension  ---
+!
+          IF( HDGL.GT.HMPX ) THEN
+            SMPX = SCHR(16,IZN)
+            HDGL = MIN( HDGL,HDOD )
+            DMPX = SMPX/(LOG10(HDOD)-LOG10(HMPX))
+            SLX = -(LOG10(HDGL)-LOG10(HDOD))*DMPX
+!            SLP = 0.D+0
+            SGX = MAX( 1.D+0-SLX,0.D+0 )
+!------------- From Zhang et al 2016-BH ------------------------------------
+            ESLX_2 = (1.D+0 + (SCHR(1,N)*HDGL)**CN)**(-CM)
+            SRX = 1.0D+0 - &
+               (1.0D+0 - SLX)/(1.0D+0 - ESLX_2) ! eqn 6a in Zhang et al 2016
+            ASLX = SLX
+            SLP = MIN( MAX( (SLX-SRX)/(1.D+0-SRX),0.D+0 ),1.D+0 )
+!--------------------------------------------------------------------------
+!
+!---      Gas-aqueous capillary head below
+!         matching-point head  ---
+!
+          ELSE
+            SLP = (1.D+0/(1.D+0 + (SCHR(1,IZN)*HDGL)**CN))**CM
+            SLX = SLP*(1.D+0-SRX) + SRX
+            SGX = MAX( 1.D+0-SLX,0.D+0 )
+            ASLX = SLP
+          ENDIF
+          ASGTX = 0.D+0
+          ASLM = MIN( ASLX,ASLMINX )
+        ELSE
+!
+!---    Two-pressure dual-porosity model  ---
+!
+          IF( ABS(IDP(IZN)).EQ.1 ) THEN
+            CN = MAX( SCHR(6,IZN),SMALL )
+            IF( SCHR(15,IZN).LE.ZERO ) THEN
+              IF( MOD( IRPL(IZN),100 ).EQ.2 ) THEN
+                CM = 1.D+0 - 2.D+0/CN
+              ELSE
+                CM = 1.D+0 - 1.D+0/CN
+              ENDIF
+            ELSE
+              CM = SCHR(15,IZN)
+            ENDIF
+            SLP = (1.D+0/(1.D+0 + (SCHR(5,IZN)*HDGL)**CN))**CM
+            REALX = REAL(ISM(IZN))
+            HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+            SMP = MAX( (1.D+0-HSCL)*SCHR(7,IZN),ZERO )
+          ELSE
+            CN = MAX( SCHR(3,IZN),SMALL )
+            IF( SCHR(14,IZN).LE.ZERO ) THEN
+              IF( MOD( IRPL(IZN),100 ).EQ.2 ) THEN
+                CM = 1.D+0 - 2.D+0/CN
+              ELSE
+                CM = 1.D+0 - 1.D+0/CN
+              ENDIF
+            ELSE
+              CM = SCHR(14,IZN)
+            ENDIF
+            SLP = (1.D+0/(1.D+0 + (SCHR(1,IZN)*HDGL)**CN))**CM
+            REALX = REAL(ISM(IZN))
+            HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+            SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
+          ENDIF
+          SLX = SLP*(1.D+0-SMP) + SMP
+          ASLX = SLP
+          ASGTX = 0.D+0
+          ASLM = MIN( ASLX,ASLMINX )
         ENDIF
-        SLX = SLP*(1.D+0-SMP) + SMP
-        ASLX = SLP
-        ASGTX = 0.D+0
-        ASLM = MIN( ASLX,ASLMINX )
 !
 !---  Brooks and Corey saturation function  ---
 !
       ELSEIF( ISCHR(IZN).EQ.2 ) THEN
         HDGL = MAX( (PGX-PLX)/RHORL/GRAV,1.D-14 )
 !
+!---    Webb extension  ---
+!
+        IF( ISM(IZN).EQ.2 ) THEN
+          HMPX = SCHR(17,IZN)
+          CL = MAX( SCHR(3,IZN),SMALL )
+          SRX = SCHR(4,IZN)
+!
+!---      Gas-aqueous capillary head above matching-point
+!         head, use Webb extension  ---
+!
+          IF( HDGL.GT.HMPX ) THEN
+            SMPX = SCHR(16,IZN)
+            HDGL = MIN( HDGL,HDOD )
+            DMPX = SMPX/(LOG10(HDOD)-LOG10(HMPX))
+            SLX = -(LOG10(HDGL)-LOG10(HDOD))*DMPX
+!            SLP = 0.D+0
+            SGX = MAX( 1.D+0-SLX,0.D+0 )
+!------------- From Zhang et al 2016-BH ------------------------------------
+            ESLX_2 = (SCHR(1,N)/HDGL)**(CL)
+            SMP = MAX( (1.D+0-HSCL)*SRX,0.D+0 )
+            SRX = 1.0D+0 - &
+                (1.0D+0 - SLX)/(1.0D+0 - ESLX_2)
+            ASLX = SLX
+            SLP = MIN( MAX( (SLX-SRX)/(1.D+0-SRX),0.D+0 ),1.D+0 )
+!---------------------------------------------------------------------
+!
+!---      Gas-aqueous capillary head below
+!         matching-point head  ---
+!
+          ELSE
+            IF( HDGL.LE.SCHR(1,IZN) ) THEN
+              SLP = 1.D+0
+            ELSE
+              SLP = (SCHR(1,IZN)/HDGL)**CL
+            ENDIF
+            SLX = SLP*(1.D+0-SRX) + SRX
+            SGX = MAX( 1.D+0-SLX,0.D+0 )
+            ASLX = SLP
+          ENDIF
+          ASGTX = 0.D+0
+          ASLM = MIN( ASLX,ASLMINX )
+        ELSE
+!
 !---    Two-pressure dual-porosity model  ---
 !
-        IF( ABS(IDP(IZN)).EQ.1 ) THEN
-          CL = MAX( SCHR(6,IZN),SMALL )
-          IF( HDGL.LE.SCHR(5,IZN) ) THEN
-            SLP = 1.D+0
+          IF( ABS(IDP(IZN)).EQ.1 ) THEN
+            CL = MAX( SCHR(6,IZN),SMALL )
+            IF( HDGL.LE.SCHR(5,IZN) ) THEN
+              SLP = 1.D+0
+            ELSE
+              SLP = (SCHR(5,IZN)/HDGL)**CL
+            ENDIF
+            REALX = REAL(ISM(IZN))
+            HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+            SMP = MAX( (1.D+0-HSCL)*SCHR(7,IZN),ZERO )
           ELSE
-            SLP = (SCHR(5,IZN)/HDGL)**CL
+            CL = MAX( SCHR(3,IZN),SMALL )
+            IF( HDGL.LE.SCHR(1,IZN) ) THEN
+              SLP = 1.D+0
+            ELSE
+              SLP = (SCHR(1,IZN)/HDGL)**CL
+            ENDIF
+            REALX = REAL(ISM(IZN))
+            HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+            SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
           ENDIF
-          REALX = REAL(ISM(IZN))
-          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-          SMP = MAX( (1.D+0-HSCL)*SCHR(7,IZN),ZERO )
-        ELSE
-          CL = MAX( SCHR(3,IZN),SMALL )
-          IF( HDGL.LE.SCHR(1,IZN) ) THEN
-            SLP = 1.D+0
-          ELSE
-            SLP = (SCHR(1,IZN)/HDGL)**CL
-          ENDIF
-          REALX = REAL(ISM(IZN))
-          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-          SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
+          SLX = SLP*(1.D+0-SMP) + SMP
+          ASLX = SLP
+          ASGTX = 0.D+0
+          ASLM = MIN( ASLX,ASLMINX )
         ENDIF
-        SLX = SLP*(1.D+0-SMP) + SMP
-        ASLX = SLP
-        ASGTX = 0.D+0
-        ASLM = MIN( ASLX,ASLMINX )
 !
 !---  Single-pressure dual-porosity
 !     van Genuchten saturation function  ---

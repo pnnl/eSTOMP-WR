@@ -276,6 +276,7 @@
       ISX = ISTART
       ICX = ICOMMA
       INDX = 0
+      NULL_ENTRY = 0
 !
 !---  End of card record error ---
 !
@@ -300,6 +301,7 @@
 !
       ELSEIF( ISTOP.EQ.ISTART ) THEN
         INDX = 1
+        NULL_ENTRY = 1
         GOTO 200
 !
 !---  Characters between commas  ---

@@ -51,8 +51,8 @@ ifeq ($(findstring constance,$(SYSTEM)),constance)
    FC = mpif90
 #  DEBUG_FLAG = -g 
 #  DEBUG_FLAG = -u -g -traceback -fpe:0 -check all 
-#  OPTIMIZE_FLAG = #-fast -O2
-   OPTIMIZE_FLAG = -O2 -fp-model precise
+  OPTIMIZE_FLAG = #-fast -O2
+#   OPTIMIZE_FLAG = -O2 -fp-model precise
 #   OPTIMIZE_FLAG = -O2
 #   OPTIMIZE_FLAG = -O2
    FCFLAGS =  $(DEBUG_FLAG) $(OPTIMIZE_FLAG) -fPIC 
@@ -167,6 +167,7 @@ SOURCEF = grid_mod.F90\
           bcj1.F90\
           bcp1.F90\
           cap1.F90\
+          eos.F90\
           chk1.F90\
           cisc1.F90\
           dpor1.F90\
@@ -280,6 +281,7 @@ FOBJS =   \
           bcj1.o\
           bcp1.o\
           cap1.o\
+          eos.o\
           chk1.o\
           cisc1.o\
           dpor1.o\

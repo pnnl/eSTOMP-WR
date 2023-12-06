@@ -720,7 +720,8 @@
               plxb = plx
               tbx = t(m,n)
 !--- Create table for pressure interpolation
-!              write(*,'(a,3I6,4F16.8)') 'me,nb,ib,xref,yref,zref,zbase',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),zbs
+!              write(*,'(a,3I6,6F16.8)') 'me,nb,ib,xref,yref,zref,xbs, &
+!                           ybs,zbs',me,nb,ib,d_xc(ib),d_yc(ib),d_zc(ib),xbs,ybs,zbs
               hgz_table_p(:,irefbx) = 0.d0
 !              call locate(hgz_table_z,nzdim,zbs,ix)
 !              hgz_table_z(ix) = zbs
@@ -934,6 +935,10 @@
                       ((zsurf-(zp(ndx)-dzgf(ndx)/2.d0))<=rsd_p(1,pft)))) then 
                       z_up = zsurf-(zp(ndx) + dzgf(ndx)/2.d0)
                       z_bt = zsurf-(zp(ndx) - dzgf(ndx)/2.d0)
+<<<<<<< HEAD
+=======
+                      if (z_up<0.d0) z_up = 0.d0
+>>>>>>> v523
                     if (IPLF_P(pft)>=3) then
                       smp = (pg(m,ndx)-pl(m,ndx))/rhol(m,ndx)/grav
                       call soil_stress (pft, smp, z_up, z_bt, wiltf(m,ndx))
@@ -949,6 +954,10 @@
           enddo
         enddo
 !        call ga_dgop(1,beta,lsv*ldx*ldy,'+')    
+<<<<<<< HEAD
+=======
+!        print*,'me,loc,ldxyz:',me,num_loc_nodes,ldx*ldy*ldz,id_l2g(1),id_l2g(num_loc_nodes)
+>>>>>>> v523
         do m = 2,isvc+2
           do lndx = 1,ldx*ldy
             if(veg_varx(2,lndx) > 0.d0) then
@@ -973,10 +982,17 @@
                       veg_sink(m,ndx) =-bcx(2) * root_fr(ndx) &
                                    * dxgf(ndx) * dygf(ndx)
                     endif
+<<<<<<< HEAD
                     veg_sink(m,ndx) = veg_sink(m,ndx)*rhol(m,ndx)
                     call crop_coeff(pft,TM,c_coef)
                     et(m,ndx) =c_coef*bcx(2) * beta(m,lndx)
                     veg_sink(m,ndx) = veg_sink(m,ndx)*c_coef
+=======
+!                    veg_sink(m,ndx) = veg_sink(m,ndx)*rhol(m,ndx)
+                    call crop_coeff(pft,TM,c_coef)
+                    evap_trans(m,ndx) =c_coef*bcx(2) * beta(m,lndx)
+                    veg_sink(m,ndx) = veg_sink(m,ndx)*rhol(m,ndx)*c_coef
+>>>>>>> v523
                   endif
                 endif
               enddo

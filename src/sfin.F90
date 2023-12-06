@@ -76,6 +76,7 @@
 !  49   gas-diffusive gas-component mass flux
 !  50   total-advective gas-component mass flux
 !  51   total-diffusive gas-component mass flux
+!  52   surface evapotranspiration
 ! 101 to 100+NSOLU
 !       solute flux - UC, VC, WC
 ! 101+NSOLU to 100+NSOLU+NEQC   
@@ -124,6 +125,7 @@
 ! use bcvs
   use grid_mod
   USE REACT
+  USE PLT_ATM
 !
   
 !----------------------Implicit Double Precision-----------------------!
@@ -156,6 +158,11 @@
   REAL*8:: idr(3),max_idr
   integer:: id_max
   integer:: vx_ceil,vy_ceil,vz_ceil
+<<<<<<< HEAD
+=======
+  REAL*8::et_fx,area_tmp
+  real*8, dimension(:), allocatable::area_et(:)
+>>>>>>> v523
 !
 !----------------------Executable Lines--------------------------------!
 !
@@ -439,6 +446,10 @@
           if(me.eq.0) WRITE(ISF(NSG),'(6A)') 'Total-Diffusive ' //  &
             GCNM(IGC)(1:NCH0) // '-Mass Flux',',', &
             UNSF(1,NS)(1:NCH1),',',UNSF(2,NS)(1:NCH2),','
+!ET-BH
+        ELSEIF( ISFT(NS).EQ.52 ) THEN
+          if(me.eq.0) WRITE(ISF(NSG),'(5A)') 'Surface actual evapotranspiration,', &
+            UNSF(1,NS)(1:NCH1),',',UNSF(2,NS)(1:NCH2),','
         ELSEIF( ISFT(NS).GT.100 .AND. ISFT(NS).LE.(100+NSOLU) ) THEN
           NSL = ISFT(NS)-100
           NCH = INDEX(SOLUT(NSL),'  ')-1
@@ -499,7 +510,7 @@
         ENDIF
         I = MIN( ABS(ISFT(NS)),100 )            
         J = ABS( ISFD(NS) )
-        IF( ISFD(NS).EQ.4 ) J = 1
+        IF( ISFD(NS).EQ.4 .OR. ISFT(NS).EQ.52) J = 1
         IF( NS.EQ.NSF .OR. NCSX.EQ.ISFGP(NSG) ) THEN
           if(me.eq.0) WRITE(ISF(NSG),9002) CHSF(I,J)//'R','(',NS,')  '
           if(me.eq.0) WRITE(ISF(NSG),9012) CHSF(I,J)//'I','(',NS,')  '
@@ -529,6 +540,8 @@
 !
 !---  Loop over the defined surfaces  ---
 !
+  allocate(area_et(nsf))
+  area_et = 0.0
   DO 7000 NS = 1,NSF
     SF(1,NS) = 0.D+0
 !    IF( ISFD(NS).EQ.4 ) THEN
@@ -559,10 +572,18 @@
      v_x = 0.D+0
      v_y = 0.D+0
      v_z = 0.D+0
+     area_et(ns) = 0.D+0
      do nx = 1, num_loc_nodes
        n = id_l2g(nx)
        if(ixp(n) == 0.or.isfc(ns,n)<=0) cycle
 !       write(*,*) 'nx,n:',nx,n
+<<<<<<< HEAD
+=======
+       if (isft(ns)==52) then
+          et_fx = evap_trans(2,n) * dxgf(n) * dygf(n)  ! m/s*m*m
+          area_et(ns) = area_et(ns) + dxgf(n) * dygf(n)
+       endif
+>>>>>>> v523
        do ifcx = 1,6
 !            NPZ = NSZ(N)
          icnx = nd2cnx(ifcx,n)
@@ -744,7 +765,9 @@
             ELSEIF( ISFT(NS).EQ.10 ) THEN
 
               sfx = q_fx*areaxx*rholx*xlwx + (dgw_fx-dla_fx)*areaxx*wtmw
-
+! ET-BH
+            ELSEIF( ISFT(NS).EQ.52 ) THEN
+              sfx = et_fx 
 !
 !---            Gas-CH4 Mass Flux  ---
 !
@@ -878,16 +901,21 @@
               sfx = areaxx*c_fx*1.d-3
             ENDIF
             RSFDX = REAL(ISFDX)
-            SF(1,NS) = SF(1,NS)+SFX*SIGN(1.D+0,RSFDX)/(TLTZX+SMALL)
+            IF (ISFT(NS) .NE. 52) THEN
+              SF(1,NS) = SF(1,NS)+SFX*SIGN(1.D+0,RSFDX)/(TLTZX+SMALL)
+            ENDIF
 !   1400         CONTINUE
 !   1500       CONTINUE
 !   1600     CONTINUE
 !        endif
        9100 continue
       enddo
+      IF (ISFT(NS)==52) THEN
+         SF(1,NS) = SF(1,NS)+SFX
+      ENDIF
     enddo
    6900 CONTINUE
-  SF(2,NS) = SF(2,NS) + SF(1,NS)*DT
+   SF(2,NS) = SF(2,NS) + SF(1,NS)*DT
    7000 CONTINUE
   VAR = TM
   IF( UNTM.NE.'null' ) THEN
@@ -911,6 +939,11 @@
   DO 8000 NS = 1,NSF
     VAR = SF(1,NS)
     call ga_dgop(1,var,1,'+')
+    if (isft(ns)==52) then
+      area_tmp = area_et(ns)
+      call ga_dgop(1,area_tmp,1,'+')
+      VAR = VAR/(area_tmp+small)
+    endif
     IF( UNSF(1,NS).NE.'null' ) THEN
       INDX = 1
       IF( ISFT(NS).EQ.1 ) THEN
@@ -1030,6 +1063,9 @@
       ELSEIF( ISFT(NS).EQ.45 ) THEN
         IUNKG = 1
         IUNS = -1
+      ELSEIF( ISFT(NS).EQ.52 ) THEN
+        IUNM = 1
+        IUNS = -1
 !
 !---      Aqueous-advective, aqueous-diffusive, gas-advective, 
 !         gas-diffusive, total-advective, and total-diffusive
@@ -1067,6 +1103,11 @@
    7800   CONTINUE
     VAR = SF(2,NS)
     call ga_dgop(1,var,1,'+')
+    if (isft(ns)==52) then
+      area_tmp = area_et(ns)
+      call ga_dgop(1,area_tmp,1,'+')
+      VAR = VAR/(area_tmp+small)
+    endif
     IF( UNSF(2,NS).NE.'null' ) THEN
       INDX = 1
       IF( ISFT(NS).EQ.1 ) THEN
@@ -1155,6 +1196,8 @@
         IUNKG = 1
       ELSEIF( ISFT(NS).EQ.45 ) THEN
         IUNKG = 1
+      ELSEIF( ISFT(NS).EQ.52 ) THEN
+        IUNM = 1
 !
 !---      Aqueous-advective, aqueous-diffusive, gas-advective, 
 !         gas-diffusive, total-advective, and total-diffusive
@@ -1200,6 +1243,7 @@
    7900   CONTINUE
    8000 CONTINUE
   IHSF = IHSF + 1
+  deallocate(area_et) 
 !
 !---  Format Statements  ---
 !

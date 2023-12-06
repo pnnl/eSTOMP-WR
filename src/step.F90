@@ -1373,6 +1373,7 @@
           CALL RD_CHR(ISTART,ICOMMA,NCH,CHDUM,FDUM)
           NCH = INDEX(FDUM,'  ')-1
           KE = BUFFEREDREAD_NLINES(FDUM(1:NCH))
+!          print*,'filename:',FDUM(1:NCH),'KE:',KE
         ENDIF
 !
 !---    Loop over coupled flow and transport boundary types  ---

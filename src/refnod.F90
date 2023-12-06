@@ -1889,7 +1889,11 @@
       ELSEIF( IRNV.EQ.289 ) THEN
         IUNM = 1
         IUNS = -1
+<<<<<<< HEAD
         VAR = ET(2,N)      
+=======
+        VAR = evap_trans(2,N)      
+>>>>>>> v523
       ENDIF
     
 !

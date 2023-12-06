@@ -172,6 +172,15 @@
             UNSF(1,NS) = 'kg/s'
             UNSF(2,NS) = 'kg'
           ENDIF
+! ET-BH
+        ELSEIF( INDEX(ADUM(1:),'et').NE.0  .OR. &
+                INDEX(ADUM(1:),'evapotrans').NE.0 ) THEN
+          IF( ME.EQ.0 )WRITE(IWR,'(A)') &
+              'Actual evapotranspiration'
+          UNSF(1,NS) = 'm/s'
+          UNSF(2,NS) = 'm'
+          ISFT(NS) = 52
+
         ELSEIF( INDEX(ADUM(1:),'solute').NE.0 ) THEN
           VARB = 'Solute Name: '
           CALL RDCHR(ISTART,ICOMMA,NCH,CHDUM,BDUM)

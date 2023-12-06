@@ -447,7 +447,11 @@
         IUNMOL = 0
       ELSEIF( IUMX.NE.IUNM .OR. IUKGX.NE.IUNKG .OR. IUSX.NE.IUNS .OR. &
           IUKX.NE.IUNK .OR. IUMOLX.NE.IUNMOL ) THEN
-
+!        print *, 'IUMX,IUNM:',IUMX,IUNM
+!        print *, 'IUKGX,IUNKG:',IUKGX,IUNKG
+!        print *, 'IUSX,IUNS:',IUSX,IUNS
+!        print *, 'IUKX,IUNK:',IUKX,IUNK
+!        print *, 'IUMOLX,IUNMOL:',IUMOLX,IUNMOL
         IF( INDX.EQ.0 .OR. INDX.EQ.2 .OR. INDX.EQ.3 ) THEN
           INDX = 4
           IF( INDX.EQ.3 ) INDX = 21

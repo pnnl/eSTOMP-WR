@@ -744,6 +744,7 @@
       INTEGER :: LNGC=1
       INTEGER :: LSPILL=0
       INTEGER :: LANI=1,LCAT=1,LNEU=1,LNAF=1,LNCF=1,LNNF=1,LMCG=1
+      INTEGER :: NULL_ENTRY = 0
 !
 !---  End of module  ---
 !
@@ -2203,7 +2204,11 @@
       INTEGER, DIMENSION(:), ALLOCATABLE :: veg_type
       REAL(KIND=DP), DIMENSION(:,:), ALLOCATABLE :: veg_varx
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  veg_sink
+<<<<<<< HEAD
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  et
+=======
+      REAL(KIND=DP), DIMENSION(:,:), pointer ::  evap_trans
+>>>>>>> v523
       REAL(KIND=DP), DIMENSION(:,:), pointer ::  wiltf
       REAL(KIND=DP), DIMENSION(:), pointer ::  root_fr
       INTEGER, DIMENSION(:), pointer ::  ibpft

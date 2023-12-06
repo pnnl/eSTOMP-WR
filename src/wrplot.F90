@@ -4239,7 +4239,11 @@
         dflg = 1
         ldim = 2
         dim1 = 2
+<<<<<<< HEAD
         call string2idx(ldim,iflg,dflg,'et',idx,t_ok)
+=======
+        call string2idx(ldim,iflg,dflg,'evap_trans',idx,t_ok)
+>>>>>>> v523
         avar = 0.d0
         call write_var(varname,UNPLOT(IPNV),iflg,dflg,idx,ldim,dim1,dim2,var,avar,me,ipl,form,0)
       ENDIF

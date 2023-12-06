@@ -288,20 +288,57 @@
 !
 !---  Return for restart simulations  ---
 !
-      IF( IEO.EQ.2 .OR. IEO.EQ.4 ) THEN
+!      IF( IEO.EQ.2 .OR. IEO.EQ.4 ) THEN
 !
 !---    Establish reference pressure for soil compressibility  ---
 !
+!        print *, 'ism:',ism
         DO 170 N = 1,num_nodes
           IF( IXP(N).EQ.0 ) GOTO 170
 !          IZN = IZ(N)
           izn = n
-          IF( CMP(3,IZN).GT.PATM ) THEN
-            PCMP(N) = CMP(3,IZN)
-          ELSE
-            PCMP(N) = MAX( PL(2,N),PG(2,N) )+PATM
+!          IF( CMP(3,IZN).GT.PATM ) THEN
+!            PCMP(N) = CMP(3,IZN)
+!          ELSE
+!            PCMP(N) = MAX( PL(2,N),PG(2,N) )+PATM
+!          ENDIF
+!
+!---    Webb saturation and capillary pressure matching points  ---
+!
+          IF( ISM(IZN).EQ.2 ) THEN
+!
+!---    van Genuchten moisture retension function  ---
+!
+            IF( ISCHR(IZN).EQ.1 ) THEN
+              IF( SCHR(14,IZN).LE.0.D+0 ) THEN
+                CNX = MAX( SCHR(3,IZN),SMALL )
+                SCHR(14,IZN) = 1.D+0 - 1.D+0/CNX
+              ENDIF
+!
+              CALL WEBB_VG(IZN)
+!
+!---    Brooks and Corey moisture retension function  ---
+!
+            ELSEIF( ISCHR(IZN).EQ.2 ) THEN
+              CALL WEBB_BC(IZN)
+!
+            ENDIF
           ENDIF
   170   CONTINUE
+!
+!---  Return for restart simulations  ---
+!
+      IF( IEO.EQ.2 .OR. IEO.EQ.4 ) THEN
+        DO 171 N = 1,num_nodes
+          IF( IXP(N).EQ.0 ) GOTO 171
+!          IZN = IZ(N)
+            izn = n
+            IF( CMP(3,IZN).GT.PATM ) THEN
+              PCMP(N) = CMP(3,IZN)
+            ELSE
+              PCMP(N) = MAX( PL(2,N),PG(2,N) )+PATM
+            ENDIF
+        171   CONTINUE
         GOTO 248
       ENDIF
 !
@@ -331,7 +368,7 @@
              ELSE
                IPH(2,N) = 2
              ENDIF
-            ELSE
+            ELSEIF (ISM(IZN).NE.2) THEN
               INDX = 16
               IMSG = N
               RLMSG = SL(2,N)
@@ -419,7 +456,7 @@
              ELSE
                IPH(2,N) = 2
              ENDIF
-            ELSE
+            ELSEIF (ISM(IZN).NE.2) THEN
               INDX = 16
               IMSG = N
               RLMSG = SL(2,N)

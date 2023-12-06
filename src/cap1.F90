@@ -77,7 +77,7 @@
       ICSNX = INDEX( SUBNMX,'  ' )-1
       SUBNM(ICSN+1:ICSN+ICSNX) = SUBNMX
       IF( INDEX(CVS_ID(204)(1:1),'$').EQ.0 ) CVS_ID(204) = &
-     '$Id: stomp1.F,v 1.50 2008/02/13 16:22:59 d3c002 Exp $' 
+      '$Id: stomp1.F,v 1.50 2008/02/13 16:22:59 d3c002 Exp $' 
       ICSN = ICSN+ICSNX
 !
 !---  van Genuchten saturation function
@@ -93,66 +93,122 @@
         ELSE
           CM = SCHR(14,IZN)
         ENDIF
-        IF( SLX.GT.SCHR(4,IZN ) ) THEN
-          SLP = (SLX-SCHR(4,IZN))/(1.D+0-SCHR(4,IZN))
-          HDGL = (((1.D+0/SLP)**(1.D+0/CM)-1.D+0)** &
-          (1.D+0/CN))/SCHR(1,IZN)
-        ELSEIF( ISM(IZN).EQ.1 ) THEN
-          HDGL = EXP((1.D+0-SLX/SCHR(4,IZN))*LOG(HDOD))
+        SRX = SCHR(4,IZN)
+!
+!---    Webb matching point  ---
+!
+        IF( ISM(IZN).EQ.2 ) THEN
+          HMPX = SCHR(17,IZN)
+          SMPX = SCHR(16,IZN)
+!
+!---      Total-liquid saturation below the matching point,
+!         use Webb extension  ---
+!
+          IF( SLX.LT.SMPX ) THEN
+            DMPX = -(LOG10(HDOD)-LOG10(HMPX))/SMPX
+            HDGL = 1.D+1**(DMPX*(SLX-SMPX) + LOG10(HMPX))
+            GAMMAX = -(LOG10(HDOD)-LOG10(HMPX))/SMPX
+            HDGL = 1.D+1**(GAMMAX*(SLX-SMPX)+LOG10(HMPX))
+!
+!---      Total-liquid saturation at or above the matching point,
+!         use van Genuchten function
+!
+          ELSE
+            SLP = (SLX-SRX)/(1.D+0-SRX)
+            HDGL = (((1.D+0/SLP)**(1.D+0/CM)-1.D+0) &
+               **(1.D+0/CN))/SCHR(1,IZN)
+          ENDIF
+          CPGL = HDGL*RHORL*GRAV
         ELSE
-          HDGL = HDOD
-          SLX = SCHR(4,IZN) + 1.D-6
+          IF( SLX.GT.SCHR(4,IZN ) ) THEN
+            SLP = (SLX-SCHR(4,IZN))/(1.D+0-SCHR(4,IZN))
+            HDGL = (((1.D+0/SLP)**(1.D+0/CM)-1.D+0)** &
+            (1.D+0/CN))/SCHR(1,IZN)
+          ELSEIF( ISM(IZN).EQ.1 ) THEN
+            HDGL = EXP((1.D+0-SLX/SCHR(4,IZN))*LOG(HDOD))
+          ELSE
+            HDGL = HDOD
+            SLX = SCHR(4,IZN) + 1.D-6
+          ENDIF
+          HDGL = MAX( HDGL,1.D-14 )
+     100  CONTINUE
+          REALX = REAL(ISM(IZN))
+          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+          SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
+          DSMP = -SCHR(4,IZN)/(HDGL*LOG(HDOD))*REALX
+          SLP = 1.D+0/((1.D+0 + (SCHR(1,IZN)*HDGL)**CN)**CM)
+          DSLP = -CM*SCHR(1,IZN)*CN*((SCHR(1,IZN)*HDGL)**(CN-1.D+0)) &
+        /((1.D+0 + (SCHR(1,IZN)*HDGL)**CN)**(CM+1.D+0))
+          SLZ = SLP*(1.D+0-SMP) + SMP
+          DSLZ = DSLP*(1.D+0-SMP) + DSMP*(1.D+0-SLP)
+          F = SLX - SLZ
+          DF = -DSLZ
+          DH = -F/(DF+SMALL)
+          IF( HDGL+DH.LT.0.D+0 ) DH = 6.D-1*DH
+          HDGL = HDGL + DH
+          IF( ABS(DH).GT.1.D-8 ) GOTO 100
+          CPGL = HDGL*RHORL*GRAV
         ENDIF
-        HDGL = MAX( HDGL,1.D-14 )
-  100   CONTINUE
-        REALX = REAL(ISM(IZN))
-        HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-        SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
-        DSMP = -SCHR(4,IZN)/(HDGL*LOG(HDOD))*REALX
-        SLP = 1.D+0/((1.D+0 + (SCHR(1,IZN)*HDGL)**CN)**CM)
-        DSLP = -CM*SCHR(1,IZN)*CN*((SCHR(1,IZN)*HDGL)**(CN-1.D+0)) &
-      /((1.D+0 + (SCHR(1,IZN)*HDGL)**CN)**(CM+1.D+0))
-        SLZ = SLP*(1.D+0-SMP) + SMP
-        DSLZ = DSLP*(1.D+0-SMP) + DSMP*(1.D+0-SLP)
-        F = SLX - SLZ
-        DF = -DSLZ
-        DH = -F/(DF+SMALL)
-        IF( HDGL+DH.LT.0.D+0 ) DH = 6.D-1*DH
-        HDGL = HDGL + DH
-        IF( ABS(DH).GT.1.D-8 ) GOTO 100
-        CPGL = HDGL*RHORL*GRAV
 !
 !---  Brooks and Corey saturation function  ---
 !
       ELSEIF( ISCHR(IZN).EQ.2 ) THEN
         CL = MAX( SCHR(3,IZN),SMALL )
-        IF( SLX.GT.SCHR(4,IZN ) ) THEN
-          SLP = (SLX-SCHR(4,IZN))/(1.D+0-SCHR(4,IZN))
-          HDGL = SCHR(1,IZN)*(1.D+0/SLP)**(1.D+0/CL)
-        ELSEIF( ISM(IZN).EQ.1 ) THEN
-          HDGL = EXP((1.D+0-SLX/SCHR(4,IZN))*LOG(HDOD))
-        ELSE
-          HDGL = HDOD
-          SLX = SCHR(4,IZN) + 1.D-9
+        SRX = SCHR(4,IZN)
+!
+!---    Webb matching point  ---
+!
+        IF( ISM(IZN).EQ.2 ) THEN
+          HMPX = SCHR(17,IZN)
+          SMPX = SCHR(16,IZN)
+!
+!---      Aqueous saturation below the matching point,
+!         use Webb extension  ---
+!
+          IF( SLX.LT.SMPX ) THEN
+            DMPX = -(LOG10(HDOD)-LOG10(HMPX))/SMPX
+            HDGL = 1.D+1**(DMPX*(SLX-SMPX) + LOG10(HMPX))
+!
+!---      Aqueous saturation at or above the matching point,
+!         use Brooks and Corey function
+!
+          ELSE
+            ASLX = (SLX-SRX)/(1.D+0-SRX)
+            IF( ASLX.GT.EPSL ) THEN
+              HDGL = SCHR(2,IZN)*(1.D+0/ASLX)**(1.D+0/CLX)
+            ELSE
+              HDGL = 0.D+0
+            ENDIF
+          ENDIF
+        ELSE         
+          IF( SLX.GT.SCHR(4,IZN ) ) THEN
+            SLP = (SLX-SCHR(4,IZN))/(1.D+0-SCHR(4,IZN))
+            HDGL = SCHR(1,IZN)*(1.D+0/SLP)**(1.D+0/CL)
+          ELSEIF( ISM(IZN).EQ.1 ) THEN
+            HDGL = EXP((1.D+0-SLX/SCHR(4,IZN))*LOG(HDOD))
+          ELSE
+            HDGL = HDOD
+            SLX = SCHR(4,IZN) + 1.D-9
+          ENDIF
+          HDGL = MAX( HDGL,1.D-14 )
+     200   CONTINUE
+          REALX = REAL(ISM(IZN))
+          HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
+          SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
+          DSMP = -SCHR(4,IZN)*REALX/(HDGL*LOG(HDOD))
+          SLP = (SCHR(1,IZN)/HDGL)**CL
+          DSLP = -CL*(SCHR(1,IZN)/(HDGL**2)) &
+          *(SCHR(1,IZN)/HDGL)**(CL-1.D+0)
+          SLZ = SLP*(1.D+0-SMP) + SMP
+          DSLZ = DSLP*(1.D+0-SMP) + DSMP*(1.D+0-SLP)
+          F = SLX - SLZ
+          DF = -DSLZ
+          DH = -F/(DF+SMALL)
+          IF( HDGL+DH.LT.0.D+0 ) DH = 6.D-1*DH
+          HDGL = HDGL + DH
+          IF( ABS(DH).GT.1.D-8 ) GOTO 200
+          CPGL = HDGL*RHORL*GRAV
         ENDIF
-        HDGL = MAX( HDGL,1.D-14 )
-  200   CONTINUE
-        REALX = REAL(ISM(IZN))
-        HSCL = MAX( LOG(HDGL)/LOG(HDOD),ZERO )*REALX
-        SMP = MAX( (1.D+0-HSCL)*SCHR(4,IZN),ZERO )
-        DSMP = -SCHR(4,IZN)*REALX/(HDGL*LOG(HDOD))
-        SLP = (SCHR(1,IZN)/HDGL)**CL
-        DSLP = -CL*(SCHR(1,IZN)/(HDGL**2)) &
-        *(SCHR(1,IZN)/HDGL)**(CL-1.D+0)
-        SLZ = SLP*(1.D+0-SMP) + SMP
-        DSLZ = DSLP*(1.D+0-SMP) + DSMP*(1.D+0-SLP)
-        F = SLX - SLZ
-        DF = -DSLZ
-        DH = -F/(DF+SMALL)
-        IF( HDGL+DH.LT.0.D+0 ) DH = 6.D-1*DH
-        HDGL = HDGL + DH
-        IF( ABS(DH).GT.1.D-8 ) GOTO 200
-        CPGL = HDGL*RHORL*GRAV
 !
 !---  Dual porosity van Genuchten saturation function
 !
